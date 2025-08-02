@@ -1,6 +1,5 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { SupabaseAdapter } from "@auth/supabase-adapter";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -9,31 +8,47 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
   ],
-  adapter: SupabaseAdapter({
-    url: process.env.SUPABASE_URL!,
-    secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  }),
-  secret: process.env.NEXTAUTH_SECRET, // <<< tambahkan ini juga di authOptions
+  // ✅ PERBAIKAN KRITIS: Hapus database adapter untuk pure JWT
+  // adapter: SupabaseAdapter({
+  //   url: process.env.SUPABASE_URL!,
+  //   secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  // }),
+  
+  // ✅ WAJIB: JWT strategy untuk middleware
+  session: {
+    strategy: "jwt",
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+  
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
-        // Ambil role dari user dan taruh ke token
-        const userWithRole = user as { role?: string };
-        token.role = userWithRole.role ?? "user"; // default "user" kalau kosong
+        // Simpan info user ke JWT token
+        token.role = user.role || "user";
+        token.email = user.email;
+        token.name = user.name;
+        token.picture = user.image;
       }
       return token;
     },
 
     async session({ session, token }) {
-      if (session.user) {
+      if (token) {
         session.user.role = token.role as string;
+        session.user.email = token.email as string;
+        session.user.name = token.name as string;
+        session.user.image = token.picture as string;
       }
       return session;
     },
   },
+  
   pages: {
-    signIn: "/auth/login",
+    signIn: "/", // Konsisten dengan middleware
   },
+  
+  // ✅ TAMBAHAN: Debug info
+  debug: process.env.NODE_ENV === "development",
 };
 
 const handler = NextAuth(authOptions);
