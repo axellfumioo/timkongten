@@ -1,128 +1,178 @@
 'use client'
-import React, { useState } from 'react';
-import {
-    Search,
-    Folder,
-    Plus,
-    UploadCloud,
-    Star,
-    Mail,
-    Menu, BookCheck, Clock, CheckCircle, Layers, Flame,
-    Check,
-    CalendarDays,
-} from 'lucide-react';
-import Sidebar from '@/components/dashboard/common/Sidebar';
-import Calendar from '@/components/dashboard/layout/Calendar';
-import TodoList from '@/components/dashboard/layout/TodoList';
-import AuthGuard from '@/components/AuthGuard';
 
-function App() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [folders, setFolders] = useState([
-        { name: "Axel IPA", deleted: false },
-        { name: "Physics Basics", deleted: false },
-    ]);
-    const [newFolderName, setNewFolderName] = useState("");
+import React, { useState, useEffect } from 'react'
+import { Menu, MoreVertical, SquarePen, UserIcon } from 'lucide-react'
+import Sidebar from '@/components/dashboard/common/Sidebar'
+import Calendar from '@/components/dashboard/layout/Calendar'
+import AuthGuard from '@/components/AuthGuard'
+import ContentModalCOC from '@/components/dashboard/layout/journal/contentModal/ContentModalCOC'
+import { supabase } from '@/app/lib/supabase'
+import { useGlobalStore } from '@/app/lib/global-store'
 
-    const createFolder = () => {
-        if (newFolderName.trim()) {
-            setFolders([...folders, { name: newFolderName, deleted: false }]);
-            setNewFolderName("");
+interface SelectedDate {
+    day: number
+    month: number
+    year: number
+}
+
+function getTodayDate(): SelectedDate {
+    const today = new Date()
+    return {
+        day: today.getDate(),
+        month: today.getMonth(),
+        year: today.getFullYear(),
+    }
+}
+
+const App = () => {
+    const [sidebarOpen, setSidebarOpen] = useState(false)
+    const [selectedDate, setSelectedDate] = useState<SelectedDate>(() => getTodayDate())
+    const [events, setEvents] = useState<any[]>([])
+    const [isLoading, setIsLoading] = useState(false)
+    const [modalOpen, setModalOpen] = useState(false)
+    const [selectedContent, setSelectedContent] = useState<any | null>(null)
+    const setUpdated = useGlobalStore((state) => state.setUpdated)
+    const updated = useGlobalStore((state) => state.updated)
+
+    const dateFormatted = `${selectedDate.year}-${String(selectedDate.month + 1).padStart(2, '0')}-${String(selectedDate.day).padStart(2, '0')}`
+
+    const formattedDateString = new Date(selectedDate.year, selectedDate.month, selectedDate.day).toLocaleDateString('id-ID', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    })
+
+
+    const fetchEvents = async () => {
+        setIsLoading(true)
+        const { data, error } = await supabase
+            .from('content')
+            .select('*, users(*)')
+            .eq('content_date', dateFormatted)
+
+        if (error) {
+            console.error('Error fetching content + user:', error)
+        } else {
+            setEvents(data)
         }
-    };
+        setIsLoading(false)
+    }
 
-    const softDeleteFolder = (index: number) => {
-        const updatedFolders = folders.map((folder, idx) =>
-            idx === index ? { ...folder, deleted: true } : folder
-        );
-        setFolders(updatedFolders);
-    };
+    useEffect(() => {
+        fetchEvents()
+    }, [dateFormatted])
+
+    useEffect(() => {
+        if (updated) {
+            fetchEvents()
+            // setUpdated(false)
+        }
+    }, [updated, dateFormatted])
 
     return (
         <AuthGuard>
             <div className="flex h-screen bg-[#0a0a0a] text-white">
-                {/* Desktop Sidebar */}
+                {/* Sidebar Desktop */}
                 <Sidebar />
 
-                {/* Mobile Layout */}
+                {/* Main Layout */}
                 <div className="flex flex-col flex-1">
+
                     {/* Mobile Navbar */}
                     <div className="md:hidden flex items-center justify-between px-5 py-4 border-b border-white/10 bg-[#0a0a0a] shadow-sm">
-                        <h2 className="text-xl font-semibold tracking-tight text-white">
-                            Tim Konten
-                        </h2>
+                        <h2 className="text-xl font-semibold tracking-tight">Tim Konten</h2>
                         <button onClick={() => setSidebarOpen(true)} aria-label="Open menu">
-                            <Menu size={28} className="text-white" />
+                            <Menu size={28} />
                         </button>
                     </div>
 
                     {/* Main Content */}
-                    <main className="flex-1 px-5 sm:px-10 pt-10 bg-[#0a0a0a] mt-0 md:mt-0 overflow-y-auto">
+                    <main className="flex-1 px-5 sm:px-10 pt-10 bg-[#0a0a0a] overflow-y-auto">
                         <div className="mb-6">
-                            <h1 className="text-4xl font-extrabold tracking-tight mb-2">Calender Of Content</h1>
-                            <p className="text-white/50 text-lg">Lihat jadwal konten </p>
+                            <h1 className="text-4xl font-extrabold mb-2">Calendar Of Content</h1>
+                            <p className="text-white/50 text-lg">Lihat jadwal konten</p>
                         </div>
-                        {/* Folder Section */}
+
                         <section className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8 mb-12">
 
-                            {/* LEFT SIDE */}
+                            {/* Kiri: Kalender */}
                             <div className="space-y-8">
-
-                                {/* Calendar */}
-                                <Calendar />
-
-                                {/* To-Do List */}
-                                <TodoList />
+                                <Calendar selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
                             </div>
 
-                            {/* RIGHT SIDE */}
+                            {/* Kanan: Motivasi & Daftar Konten */}
                             <div className="space-y-8">
 
-                                {/* Motivasi Hari Ini */}
+                                {/* Motivasi */}
                                 <div className="bg-gradient-to-br from-[#1f1f2b] to-[#121212] p-6 rounded-3xl shadow-xl border border-white/5">
-                                    <h2 className="text-xl font-bold mb-3 flex items-center gap-2">🔥 Motivasi Hari Ini</h2>
-                                    <p className="text-white/80 text-base italic leading-relaxed">
-                                        Jangan tunggu semangat, jalanin aja dulu. Karena hasil gak pernah ngkhianatin proses.
-                                    </p>
-                                    <div className="text-sm text-white/30 mt-4">#MentalJuara</div>
+                                    <h2 className="text-xl font-bold mb-3">🔥 Motivasi Hari Ini</h2>
+                                    <p className="text-white/80 italic">SEMANGAT PAGI! 🔥👍🏻</p>
+                                    <div className="text-sm text-white/30 mt-4">#KELAZZKING</div>
                                 </div>
 
-                                {/* Upcoming Events */}
-                                <div className="bg-[#121212] p-6 rounded-3xl shadow-lg border border-white/5">
-                                    <h2 className="text-xl font-bold mb-4 flex items-center gap-2">📅 Upcoming To-Do List</h2>
-                                    <ul className="space-y-4 text-sm text-white/80">
-                                        {[
-                                            {
-                                                title: '🧪 Ulangan Harian Kimia',
-                                                date: '26 April 2025',
-                                                detail: 'Bab: Ikatan Kimia & Reaksi Redoks'
-                                            },
-                                            {
-                                                title: '📜 Tugas Sejarah',
-                                                date: '28 April 2025',
-                                                detail: 'Analisis peran pahlawan nasional'
-                                            },
-                                            {
-                                                title: '🎤 Presentasi Bahasa Inggris',
-                                                date: 'Jumat, 2 Mei 2025',
-                                                detail: 'Topik: Global Warming'
-                                            }
-                                        ].map((event, i) => (
-                                            <li key={i} className="bg-[#1a1a1a] p-4 rounded-xl border border-white/10">
-                                                <p className="text-white font-semibold mb-1">{event.title}</p>
-                                                <p className="text-white/60">Tanggal: {event.date}</p>
-                                                <p className="text-white/50">{event.detail}</p>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
+                                {/* Konten Hari Ini */}
+                                <div className="bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl p-6">
+                                    <h2 className="text-xl font-bold mb-5">📅 {formattedDateString}</h2>
 
+                                    {isLoading ? (
+                                        <div className="text-center py-8">
+                                            <div className="relative w-8 h-8 mx-auto">
+                                                <div className="absolute inset-0 border-[3px] border-white border-t-transparent rounded-full animate-spin"></div>
+                                            </div>
+                                            <p className="text-sm font-medium text-white/70 animate-pulse mt-2">Memuat konten...</p>
+                                        </div>
+                                    ) : (
+                                        <ul className="space-y-4 text-sm text-white/80">
+                                            {events.length === 0 ? (
+                                                <p className="text-white/40 text-center italic">Belum ada konten</p>
+                                            ) : (
+                                                events.map((event, i) => (
+                                                    <li
+                                                        key={i}
+                                                        className="bg-[#1a1a1a] p-4 rounded-xl border border-white/10 hover:border-white/20 transition-all group relative"
+                                                    >
+                                                        <div className="flex items-start justify-between">
+                                                            <div className="flex-1">
+                                                                <p className="text-white font-semibold mb-1">{event.content_title}</p>
+                                                                <p className="text-white/50 mb-2 text-clip">{(event.content_caption || '-').slice(0, 75)}</p>
+                                                                <div className="flex items-center gap-2 text-xs text-white/40">
+                                                                    <UserIcon />
+                                                                    <span>{event.user_name || 'Tidak dikenal'}</span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="relative">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedContent(event)
+                                                                        setModalOpen(true)
+                                                                    }}
+                                                                    className="text-white/40 hover:bg-white/10 transition-transform hover:text-white p-2 rounded-full cursor-pointer"
+                                                                >
+                                                                    <SquarePen size={18} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </li>
+                                                ))
+                                            )}
+                                        </ul>
+                                    )}
+                                </div>
                             </div>
                         </section>
                     </main>
+
+                    {/* Modal Konten */}
+                    <ContentModalCOC
+                        isOpen={modalOpen}
+                        selectedContent={selectedContent}
+                        onClose={() => setModalOpen(false)}
+                    />
                 </div>
 
-                {/* Mobile Sidebar */}
+                {/* Sidebar Mobile */}
                 <Sidebar isMobile isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
                 {/* Backdrop */}
@@ -134,7 +184,7 @@ function App() {
                 )}
             </div>
         </AuthGuard>
-    );
+    )
 }
 
-export default App;
+export default App

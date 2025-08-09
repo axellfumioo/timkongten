@@ -16,28 +16,32 @@ import Calendar from '@/components/dashboard/layout/Calendar';
 import TodoList from '@/components/dashboard/layout/TodoList';
 import AuthGuard from '@/components/AuthGuard';
 
+interface SelectedDate {
+    day: number
+    month: number
+    year: number
+}
+
+function getTodayDate(): SelectedDate {
+    const today = new Date()
+    return {
+        day: today.getDate(),
+        month: today.getMonth(),
+        year: today.getFullYear(),
+    }
+}
+
+
 function App() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [folders, setFolders] = useState([
-        { name: "Axel IPA", deleted: false },
-        { name: "Physics Basics", deleted: false },
-    ]);
-    const [newFolderName, setNewFolderName] = useState("");
+    const [selectedDate, setSelectedDate] = useState<SelectedDate>(() => getTodayDate())
 
-    const createFolder = () => {
-        if (newFolderName.trim()) {
-            setFolders([...folders, { name: newFolderName, deleted: false }]);
-            setNewFolderName("");
-        }
-    };
-
-    const softDeleteFolder = (index: number) => {
-        const updatedFolders = folders.map((folder, idx) =>
-            idx === index ? { ...folder, deleted: true } : folder
-        );
-        setFolders(updatedFolders);
-    };
-
+    const formatted = new Date(selectedDate.year, selectedDate.month, selectedDate.day).toLocaleDateString('id-ID', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    })
     return (
         <AuthGuard>
             <div className="flex h-screen bg-[#0a0a0a] text-white">
@@ -65,22 +69,22 @@ function App() {
 
                         <section className='mb-12'>
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div className="p-6 bg-[#151515] hover:bg-[#1f1f1f] border border-white/10 rounded-xl shadow-sm transition-all">
+                                <div className="p-6 bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl transition-all">
                                     <CheckCircle className="text-green-400 mb-2" />
                                     <p className="text-3xl font-bold">12</p>
                                     <p className="text-sm text-gray-400">Total Konten</p>
                                 </div>
-                                <div className="p-6 bg-[#151515] hover:bg-[#1f1f1f] border border-white/10 rounded-xl shadow-sm transition-all">
+                                <div className="p-6 bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl transition-all">
                                     <BookCheck className="text-indigo-400 mb-2" />
                                     <p className="text-3xl font-bold">32</p>
                                     <p className="text-sm text-gray-400">Konten Kamu</p>
                                 </div>
-                                <div className="p-6 bg-[#151515] hover:bg-[#1f1f1f] border border-white/10 rounded-xl shadow-sm transition-all">
+                                <div className="p-6 bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl transition-all">
                                     <CalendarDays className="text-yellow-400 mb-2" />
                                     <p className="text-3xl font-bold">3</p>
                                     <p className="text-sm text-gray-400">Konten Terjadwal</p>
                                 </div>
-                                <div className="p-6 bg-[#151515] hover:bg-[#1f1f1f] border border-white/10 rounded-xl shadow-sm transition-all">
+                                <div className="p-6 bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl transition-all">
                                     <CalendarDays className="text-yellow-400 mb-2" />
                                     <p className="text-3xl font-bold">3</p>
                                     <p className="text-sm text-gray-400">Konten Terjadwal</p>
@@ -90,6 +94,7 @@ function App() {
 
                         {/* Folder Section */}
                         <section className="w-full gap-8 mb-12">
+                            {/* To-Do List */}
                             <TodoList/>
                         </section>
                     </main>

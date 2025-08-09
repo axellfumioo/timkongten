@@ -1,5 +1,7 @@
 'use client'
-import React, { useState } from 'react'
+import { supabase } from '@/app/lib/supabase'
+import React, { useState, useEffect } from 'react'
+import { useGlobalStore } from '@/app/lib/global-store';
 
 type CalendarDay = {
     day: number
@@ -8,18 +10,57 @@ type CalendarDay = {
     year: number
 }
 
+interface SelectedDate {
+    day: any
+    month: any
+    year: any
+}
+
+interface CalendarProps {
+    selectedDate: SelectedDate | null
+    setSelectedDate: (date: SelectedDate) => void
+}
+
 const weekdays = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
 
-const Calendar = () => {
+const Calendar = ({ selectedDate, setSelectedDate }: CalendarProps) => {
     const today = new Date()
     const [currentDate, setCurrentDate] = useState(new Date())
-    const [selectedDate, setSelectedDate] = useState<CalendarDay | null>(null)
+    const [events, setEvents] = useState<Record<string, string>>({})
+    const updated = useGlobalStore((state) => state.updated);
+    const setUpdated = useGlobalStore((state) => state.setUpdated);
 
-    const dummyEvents: Record<string, string> = {
-        '2025-04-26': 'Ulangan Kimia',
-        '2025-04-28': 'Tugas Sejarah',
-        '2025-05-02': 'Presentasi Inggris',
-    }
+    // Fetch event dari Supabase
+    useEffect(() => {
+        const fetchEvents = async () => {
+            const { data, error } = await supabase
+                .from('content')
+                .select('content_date, content_title')
+                .gte('content_date', '2025-08-01')
+                .lt('content_date', '2026-12-30');
+
+            if (error) {
+                console.error('Error fetching events:', error);
+                return;
+            }
+
+            const eventMap: Record<string, string> = {};
+            data?.forEach((item) => {
+                if (item.content_date && item.content_title) {
+                    eventMap[item.content_date] = item.content_title;
+                }
+            });
+
+            setEvents(eventMap);
+        };
+
+        // Panggil saat mount & saat updated = true
+        if (updated) {
+            fetchEvents();
+            setUpdated(false);
+        }
+        fetchEvents();
+    }, [updated]);
 
     const getDaysInMonth = (year: number, month: number) =>
         new Date(year, month + 1, 0).getDate()
@@ -40,7 +81,7 @@ const Calendar = () => {
 
         const days: CalendarDay[] = []
 
-        // Days from previous month
+        // Previous month
         for (let i = startDay - 1; i >= 0; i--) {
             days.push({
                 day: daysInPrevMonth - i,
@@ -60,7 +101,7 @@ const Calendar = () => {
             })
         }
 
-        // Fill next month
+        // Next month filler
         const remaining = 42 - days.length
         for (let i = 1; i <= remaining; i++) {
             days.push({
@@ -129,20 +170,18 @@ const Calendar = () => {
                         selectedDate.year === year
 
                     const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-                    const hasEvent = !!dummyEvents[dateKey]
+                    const hasEvent = !!events[dateKey]
 
                     return (
                         <div
                             key={i}
-                            onClick={() => setSelectedDate({ day, month, year, currentMonth })}
-                            className={`
-                relative aspect-square flex items-center justify-center text-xs rounded-xl cursor-pointer
-                transition-all
-                ${currentMonth ? 'text-white hover:bg-white/10' : 'text-white/30'}
-                ${isToday ? 'border border-white font-bold' : ''}
-                ${isSelected ? 'bg-white/20' : ''}
-              `}
-                            title={hasEvent ? dummyEvents[dateKey] : ''}
+                            onClick={() => setSelectedDate({ day, month, year })}
+                            className={`relative aspect-square flex items-center justify-center text-xs rounded-xl cursor-pointer transition-all
+                            ${currentMonth ? 'text-white hover:bg-white/10' : 'text-white/30'}
+                            ${isToday ? 'border border-white font-bold' : ''}
+                            ${isSelected ? 'bg-white/20' : ''}
+                          `}
+                            title={hasEvent ? events[dateKey] : ''}
                         >
                             {day}
                             {hasEvent && (

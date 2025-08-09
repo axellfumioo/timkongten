@@ -1,9 +1,7 @@
 'use client'
 import React, { useState } from 'react';
 import {
-    Plus,
     Menu,
-    DownloadCloud,
     Download,
 } from 'lucide-react';
 import Sidebar from '@/components/dashboard/common/Sidebar';
@@ -13,7 +11,8 @@ import AuthGuard from '@/components/AuthGuard';
 function App() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     var notes = [
-        { title: "aselole", description: "awokawokwa", url: "/logosmk.png", urlDownload: "https://google.com" }
+        { title: "Logo SMK Putih", description: "Logo SMK Telkom Putih", url: "/logosmk.png", urlDownload: "/logosmkputih.png" },
+        { title: "Logo SMK Hitam", description: "Logo SMK Telkom Hitam", url: "/logo.png", urlDownload: "/logosmkhitam.png" },
     ]
     return (
         <AuthGuard>
@@ -43,13 +42,6 @@ function App() {
                         <section className="bg-[#121212] p-6 rounded-3xl shadow-lg border border-white/5">
                             <div className="flex items-center justify-between mb-5">
                                 <h2 className="text-xl font-bold gap-2">📂 File Assets</h2>
-                                <button
-                                    className="flex-none flex items-center justify-center px-4 py-3 bg-white/10 hover:bg-white/15 text-white rounded-xl border border-white/10 transition-colors"
-                                    aria-label="Buat catatan baru"
-                                >
-                                    <Plus size={18} className="mr-0 md:mr-2" />
-                                    <span className="font-medium text-sm hidden md:inline">Tambah Assets</span>
-                                </button>
                             </div>
                             <NotesHeader />
 
@@ -65,7 +57,7 @@ function App() {
                                                 className="bg-[#121212] border border-white/10 rounded-2xl p-4 flex flex-col shadow-sm hover:shadow-md transition-all"
                                             >
                                                 {/* Gambar thumbnail */}
-                                                <div className="w-full h-40 bg-gray-950 rounded-lg overflow-hidden mb-3">
+                                                <div className="w-full h-40 bg-[#1c1c1c] rounded-lg overflow-hidden mb-3">
                                                     <img
                                                         src={note.url || '/placeholder.png'} // fallback placeholder
                                                         alt={note.title}
@@ -83,9 +75,13 @@ function App() {
                                                 {/* Tombol download */}
                                                 <div className="mt-auto">
                                                     {note.urlDownload ? (
-                                                        <button className="flex items-center justify-center gap-2 bg-white text-[#0a0a0a] w-full px-4 py-2 rounded-md font-semibold hover:bg-gray-200 mb-2 text-sm">
+                                                        <a
+                                                            href={note.urlDownload}
+                                                            download
+                                                            className="flex items-center justify-center gap-2 bg-white text-[#0a0a0a] w-full px-4 py-2 rounded-md font-semibold hover:bg-gray-200 mb-2 text-sm"
+                                                        >
                                                             <Download size={18} /> Download
-                                                        </button>
+                                                        </a>
                                                     ) : (
                                                         <button disabled className="w-full block text-center px-4 py-2 text-sm font-medium text-white/50 bg-gray-800 rounded-lg cursor-not-allowed">
                                                             Tidak tersedia
