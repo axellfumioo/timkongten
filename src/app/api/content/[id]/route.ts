@@ -25,9 +25,9 @@ function getCacheKeyByMonth(dateStr: string) {
  */
 export async function GET(
   req: NextRequest,
-  context: { params: Record<string, string> }
+  { params }: { params: { id: string } }
 ) {
-  const id = context.params.id;
+  const { id } = params;
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
