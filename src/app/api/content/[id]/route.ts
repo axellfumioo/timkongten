@@ -20,10 +20,15 @@ function getCacheKeyByMonth(dateStr: string) {
   return `${CACHE_PREFIX}${month}`;
 }
 
+/**
+ * GET content by ID
+ */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
+  const { id } = context.params;
+
   const session = await getServerSession(authOptions);
   const user = session?.user;
   if (!user?.email)
@@ -33,7 +38,7 @@ export async function GET(
   const { data: contentData, error: fetchError } = await supabase
     .from("content")
     .select("content_date")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (fetchError || !contentData)
@@ -42,7 +47,7 @@ export async function GET(
   let cacheKey;
   try {
     cacheKey = getCacheKeyByMonth(contentData.content_date);
-  } catch (err) {
+  } catch {
     return NextResponse.json(
       { error: "Invalid content_date format" },
       { status: 400 }
@@ -53,7 +58,7 @@ export async function GET(
   const cached = await redis.get(cacheKey);
   if (cached) {
     const cachedData = JSON.parse(cached);
-    const item = cachedData.find((c: any) => c.id === params.id);
+    const item = cachedData.find((c: any) => c.id === id);
     if (item) return NextResponse.json(item);
   }
 
@@ -61,7 +66,7 @@ export async function GET(
   const { data, error } = await supabase
     .from("content")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (error)
@@ -69,7 +74,7 @@ export async function GET(
 
   // Update cache bulan
   let monthCache: any[] = cached ? JSON.parse(cached) : [];
-  const idx = monthCache.findIndex((c) => c.id === params.id);
+  const idx = monthCache.findIndex((c) => c.id === id);
   if (idx !== -1) monthCache[idx] = data;
   else monthCache.push(data);
 
@@ -83,13 +88,14 @@ export async function GET(
   return NextResponse.json(data);
 }
 
+/**
+ * DELETE content by ID
+ */
 export async function DELETE(
   req: NextRequest,
   context: { params: { id: string } }
 ) {
-  // Wajib await params
-  const params = await context.params;
-  const id = params.id;
+  const { id } = context.params;
 
   // Auth check
   const session = await getServerSession(authOptions);
@@ -152,10 +158,15 @@ export async function DELETE(
   return NextResponse.json({ message: "Deleted successfully" });
 }
 
+/**
+ * PUT (update) content by ID
+ */
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
+  const { id } = context.params;
+
   const session = await getServerSession(authOptions);
   const user = session?.user;
   if (!user?.email)
@@ -199,7 +210,7 @@ export async function PUT(
         content_feedback,
         content_date,
       })
-      .eq("id", params.id)
+      .eq("id", id)
       .select();
 
     if (error)
