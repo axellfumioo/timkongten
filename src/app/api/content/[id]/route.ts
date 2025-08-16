@@ -25,9 +25,9 @@ function getCacheKeyByMonth(dateStr: string) {
  */
 export async function GET(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Record<string, string> }
 ) {
-  const { id } = context.params;
+  const id = context.params.id;
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
@@ -93,9 +93,9 @@ export async function GET(
  */
 export async function DELETE(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Record<string, string> }
 ) {
-  const { id } = context.params;
+  const id = context.params.id;
 
   // Auth check
   const session = await getServerSession(authOptions);
@@ -163,9 +163,9 @@ export async function DELETE(
  */
 export async function PUT(
   req: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Record<string, string> }
 ) {
-  const { id } = context.params;
+  const id = context.params.id;
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
