@@ -3,7 +3,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 
 export const r2 = new S3Client({
   region: 'auto',
-  endpoint: process.env.R2_ENDPOINT, // contoh: https://<account_id>.r2.cloudflarestorage.com
+  endpoint: `${process.env.R2_ENDPOINT}`, // contoh: https://<account_id>.r2.cloudflarestorage.com
   credentials: {
     accessKeyId: process.env.R2_ACCESS_KEY_ID!,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
@@ -22,5 +22,5 @@ export const uploadToR2 = async (file: File, filename: string, bucket: string) =
 
   await r2.send(command)
 
-  return `${process.env.R2_PUBLIC_URL}/${filename}`
+  return `https://image.axellfumioo.my.id/humas/${filename}`
 }

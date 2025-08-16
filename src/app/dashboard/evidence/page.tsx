@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-    Eye, Edit, TrashIcon, Search, CalendarDays, Plus, UploadCloud, BarChart2, Briefcase
+    Eye, Edit, TrashIcon, Search, CalendarDays, Plus, UploadCloud, BarChart2, Briefcase,
+    Menu
 } from 'lucide-react';
 import Sidebar from '@/components/dashboard/common/Sidebar';
 import AuthGuard from '@/components/AuthGuard';
@@ -11,6 +12,8 @@ import ContentModal from '@/components/dashboard/layout/contentModal';
 import Toast from 'typescript-toastify';
 import { useGlobalStore } from '@/app/lib/global-store';
 import { useSession } from "next-auth/react"
+import ContentModalEvidence from '@/components/dashboard/layout/journal/contentModal/ContentModalEvidence';
+import EvidenceModal from '@/components/dashboard/layout/journal/contentModal/EvidenceModal';
 
 // tipe evidence
 type EvidenceStatus = 'needaction' | 'accepted' | 'rejected' | 'pending';
@@ -36,14 +39,19 @@ function EvidenceDashboard() {
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [userToDelete, setUserToDelete] = useState<Evidence | null>(null);
     const [confirmOpen, setConfirmOpen] = useState(false);
+    const [contentModalOpen, setContentModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [modalOpen, setModalOpen] = useState(false);
+    const [proofOpen, setProofOpen] = useState(false);
     const { data: session, status } = useSession()
     const [acceptedEvidenceTotal, setAcceptedEvidenceTotal] = useState(0);
     const setUpdated = useGlobalStore((state) => state.setUpdated)
     const updated = useGlobalStore((state) => state.updated)
     const [evidenceData, setEvidenceData] = useState<Evidence[]>([]);
     const [loading, setLoading] = useState(false);
+    const [selectedContent, setSelectedContent] = useState<any | null>(null)
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [selectedId, setSelectedId] = useState('');
 
     // data form
     const [formData, setFormData] = useState({
@@ -65,12 +73,9 @@ function EvidenceDashboard() {
                 return;
             }
 
-            const dateObj = new Date(new Date().getFullYear(), selectedMonth, 1);
-
             const query = new URLSearchParams({
                 user: user_email,
-                year: dateObj.getFullYear().toString(),
-                month: String(dateObj.getMonth() + 1).padStart(2, '0'),
+                month: String(selectedMonth + 1).padStart(2, '0'), // ✅ hanya kirim month
                 find: searchTerm
             }).toString();
 
@@ -78,7 +83,6 @@ function EvidenceDashboard() {
             if (!res.ok) throw new Error('Gagal fetch data');
             const data = await res.json();
 
-            // ambil array evidence dari `data.data`
             const mapped: Evidence[] = (data.data || []).map((item: any) => ({
                 id: item.id,
                 title: item.evidence_title,
@@ -89,7 +93,10 @@ function EvidenceDashboard() {
             }));
 
             setEvidenceData(mapped);
-            setAcceptedEvidenceTotal(Number(data.acceptedEvidenceTotal));
+
+            // API udah balikin acceptedEvidences
+            setAcceptedEvidenceTotal(Number(data.acceptedEvidences));
+
         } catch (err) {
             console.error(err);
             setEvidenceData([]);
@@ -139,22 +146,26 @@ function EvidenceDashboard() {
 
     const filteredEvidence = evidenceData
         .filter((item) => {
-            const itemMonth = new Date(item.date).getMonth();
+            const itemDate = new Date(item.date);
+            const itemMonth = itemDate.getMonth();
+            const itemYear = itemDate.getFullYear();
+
             const statusMatch =
                 selectedStatus === 'Semua' || item.status === selectedStatus;
-            return itemMonth === selectedMonth && statusMatch;
+
+            const monthMatch = itemMonth === selectedMonth;
+            const yearMatch =
+                selectedYear === null || itemYear === selectedYear;
+
+            return monthMatch && yearMatch && statusMatch;
         })
         .sort((a, b) => {
-            // Urutkan berdasarkan status dulu
             const statusDiff = statusOrder[a.status] - statusOrder[b.status];
             if (statusDiff !== 0) return statusDiff;
-
-            // Kalau status sama, urutkan berdasarkan tanggal
             return sortOrder === 'asc'
                 ? new Date(a.date).getTime() - new Date(b.date).getTime()
                 : new Date(b.date).getTime() - new Date(a.date).getTime();
         });
-
 
 
     // handle input change
@@ -232,6 +243,15 @@ function EvidenceDashboard() {
                 <Sidebar />
 
                 <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
+                    {/* Mobile Navbar */}
+                    <div className="md:hidden flex items-center justify-between px-5 py-4 border-b border-white/10 bg-[#0a0a0a] shadow-sm">
+                        <h2 className="text-xl font-semibold tracking-tight text-white">
+                            Tim Konten
+                        </h2>
+                        <button onClick={() => setSidebarOpen(true)} aria-label="Open menu">
+                            <Menu size={28} className="text-white" />
+                        </button>
+                    </div>
                     {/* Modals */}
                     <ContentModal
                         isOpen={modalOpen}
@@ -464,15 +484,25 @@ function EvidenceDashboard() {
 
                                                             {/* Right Side: Actions */}
                                                             <div className="flex items-center gap-2 shrink-0">
-                                                                <button
-                                                                    className="p-2 hover:bg-white/10 rounded-lg transition"
-                                                                    title="Lihat"
-                                                                >
-                                                                    <Eye size={18} />
-                                                                </button>
+                                                                {item.status !== "needaction" && (
+                                                                    <button
+                                                                        className="p-2 hover:bg-white/10 rounded-lg transition"
+                                                                        title="Lihat"
+                                                                        onClick={() => {
+                                                                            setProofOpen(true);
+                                                                            setSelectedId(item.id);
+                                                                        }}
+                                                                    >
+                                                                        <Eye size={18} />
+                                                                    </button>
+                                                                )}
                                                                 <button
                                                                     className="p-2 hover:bg-white/10 rounded-lg transition"
                                                                     title="Edit"
+                                                                    onClick={() => {
+                                                                        setSelectedContent(item);
+                                                                        setContentModalOpen(true);
+                                                                    }}
                                                                 >
                                                                     <Edit size={18} />
                                                                 </button>
@@ -512,24 +542,50 @@ function EvidenceDashboard() {
                                     <div className="flex items-center justify-between mb-3">
                                         <h2 className="text-sm font-semibold text-white flex items-center gap-2">
                                             <BarChart2 size={18} className="text-white/80" />
-                                            Total Evidence {monthNames[selectedMonth]}
+                                            Total Evidence {monthNames[selectedMonth]} {selectedYear}
                                         </h2>
                                     </div>
 
-                                    <div className="flex items-end justify-center">
+                                    <div
+                                        className={`flex items-end justify-center transition-filter duration-500 ease-in-out ${loading ? "filter blur-sm opacity-70" : "filter-none opacity-100"
+                                            }`}
+                                    >
                                         <p className="text-[2.5rem] font-bold text-white leading-none">
                                             {acceptedEvidenceTotal}
                                         </p>
                                     </div>
+
                                 </div>
 
+                                {/* Filter Tahun */}
+                                <div className="mb-4">
+                                    <select
+                                        value={selectedYear}
+                                        onChange={(e) => {
+                                            const newYear = Number(e.target.value);
+                                            console.log("Tahun dipilih:", newYear); // debug pas pilih tahun
+                                            setSelectedYear(newYear);
+                                        }}
+                                        className="w-full rounded-lg border border-white/10 bg-white/5 text-white px-4 py-2 focus:outline-none focus:ring-2 focus:ring-white/20 transition"
+                                    >
+                                        {Array.from({ length: 5 }, (_, i) => {
+                                            const year = new Date().getFullYear() - 2 + i;
+                                            console.log("Render opsi tahun:", year); // debug saat render opsi
+                                            return (
+                                                <option key={year} value={year} className="bg-black text-white">
+                                                    {year}
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                </div>
 
 
                                 {/* Filter Bulan */}
                                 <div className="bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl p-5">
                                     <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
                                         <CalendarDays size={16} className="text-white/80" />
-                                        Filter Bulan ({new Date().getFullYear()})
+                                        Filter Bulan ({selectedYear})
                                     </h2>
                                     <div className="grid grid-cols-2 gap-2">
                                         {monthNames.map((month, i) => {
@@ -553,6 +609,19 @@ function EvidenceDashboard() {
                             </div>
 
                         </div>
+                        {/* Modal Konten */}
+                        <ContentModalEvidence
+                            isOpen={contentModalOpen}
+                            selectedEvidence={selectedContent}
+                            onClose={() => setContentModalOpen(false)}
+                        />
+
+                        {/* Modal Konten */}
+                        <EvidenceModal
+                            proofOpen={proofOpen}
+                            selectedId={selectedId}
+                            setProofOpen={setProofOpen}
+                        />
                     </main>
                 </div>
 

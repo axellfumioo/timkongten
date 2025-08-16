@@ -13,6 +13,7 @@ export async function logActivity(data: {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "x-api-key": process.env.INTERNAL_API_KEY!,
       },
       body: JSON.stringify(data),
     });

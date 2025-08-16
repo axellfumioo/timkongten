@@ -3,9 +3,20 @@ import { NextResponse } from "next/server";
 import { uploadToR2 } from "@/app/lib/uploadToR2";
 import { randomUUID } from "crypto";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/lib/auth"; // pastikan ini ada
 
 import { logActivity } from "@/app/lib/logActivity";
+import Redis from "ioredis";
+import { authOptions } from "@/app/lib/authOptions";
+
+const redis = new Redis(process.env.REDIS_URL!);
+const CACHE_EXPIRE_SECONDS = 600; // 2 jam cache
+
+// Helper dapetin bulan format MM dari tanggal yyyy-mm-dd
+function getMonthFromDate(dateStr: string): string {
+  if (!dateStr) return "all";
+  const parts = dateStr.split("-");
+  return parts[1]?.padStart(2, "0") || "all";
+}
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -14,61 +25,34 @@ export async function GET(req: Request) {
   if (!userauth?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
   const { searchParams } = new URL(req.url);
-
   const user = searchParams.get("user");
-  const date = searchParams.get("date");
-  const month = searchParams.get("month");
-  const year = searchParams.get("year");
-  const find = searchParams.get("find");
+  const monthParam = searchParams.get("month");
 
-  console.log("Filters active:", { user, date, month, year, find });
+  const currentMonth = String(new Date().getMonth() + 1).padStart(2, "0");
+  const evidenceMonth = monthParam ? monthParam.padStart(2, "0") : currentMonth;
 
-  let query = supabase.from("evidence").select("*", { count: "exact" });
+  const cacheKey = `evidence:${evidenceMonth}`;
 
-  // Filter berdasarkan user_email
+  // Cek cache
+  const cachedData = await redis.get(cacheKey);
+  if (cachedData) {
+    console.log(`Cache hit for key: ${cacheKey}`);
+    const cachedJson: any[] = JSON.parse(cachedData);
+    const acceptedEvidences = cachedJson.filter(
+      (item) => item.evidence_status === "accepted"
+    ).length;
+    return NextResponse.json({ data: cachedJson, acceptedEvidences });
+  }
+
+  // Ambil SEMUA data user
+  let query = supabase.from("evidence").select("*");
+
   if (user) {
     query = query.eq("user_email", user);
   }
 
-  // Filter tanggal spesifik
-  if (date) {
-    const [day, monthStr, yearStr] = date.split("/");
-    const startDate = new Date(
-      `${yearStr}-${monthStr.padStart(2, "0")}-${day.padStart(
-        2,
-        "0"
-      )}T00:00:00Z`
-    );
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 1);
-
-    query = query
-      .gte("evidence_date", startDate.toISOString())
-      .lt("evidence_date", endDate.toISOString());
-  }
-
-  // Filter bulan & tahun (untuk list data)
-  if (month && year) {
-    const monthNum = Number(month);
-    const yearNum = Number(year);
-
-    const startDate = new Date(yearNum, monthNum - 1, 1);
-    const endDate = new Date(yearNum, monthNum, 1);
-
-    query = query
-      .gte("evidence_date", startDate.toISOString())
-      .lt("evidence_date", endDate.toISOString());
-  }
-
-  // Filter pencarian keyword
-  if (find && find.trim() !== "") {
-    query = query.or(
-      `evidence_title.ilike.%${find}%,evidence_description.ilike.%${find}%`
-    );
-  }
-
-  // Eksekusi query utama
   const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) {
@@ -76,46 +60,21 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Ambil total bulan ini (tanpa filter user/find/date)
-  let evidenceTotal = 0;
-  let acceptedEvidenceTotal = 0;
+  // Filter bulan di JS tanpa peduli tahun
+  const rows: any[] = (data || []).filter((item) => {
+    const month = String(new Date(item.evidence_date).getMonth() + 1).padStart(
+      2,
+      "0"
+    );
+    return month === evidenceMonth;
+  });
 
-  if (month && year) {
-    const monthNum = Number(month);
-    const yearNum = Number(year);
+  const acceptedEvidences =
+    rows.filter((item) => item.evidence_status === "accepted").length || 0;
 
-    const startDate = new Date(yearNum, monthNum - 1, 1);
-    const endDate = new Date(yearNum, monthNum, 1);
+  await redis.set(cacheKey, JSON.stringify(rows), "EX", CACHE_EXPIRE_SECONDS);
 
-    // Total semua evidence bulan ini
-    const { count: totalCount, error: countError } = await supabase
-      .from("evidence")
-      .select("*", { count: "exact", head: true })
-      .gte("evidence_date", startDate.toISOString())
-      .lt("evidence_date", endDate.toISOString());
-
-    if (countError) {
-      console.error("Count error:", countError);
-    } else {
-      evidenceTotal = totalCount ?? 0;
-    }
-
-    // Total accepted evidence bulan ini
-    const { count: acceptedCount, error: acceptedCountError } = await supabase
-      .from("evidence")
-      .select("*", { count: "exact", head: true })
-      .gte("evidence_date", startDate.toISOString())
-      .lt("evidence_date", endDate.toISOString())
-      .eq("evidence_status", "accepted");
-
-    if (acceptedCountError) {
-      console.error("Accepted Count error:", acceptedCountError);
-    } else {
-      acceptedEvidenceTotal = acceptedCount ?? 0;
-    }
-  }
-
-  return NextResponse.json({ data, evidenceTotal, acceptedEvidenceTotal });
+  return NextResponse.json({ data: rows, acceptedEvidences });
 }
 
 export async function POST(req: Request) {
@@ -128,10 +87,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const user_email = session.user?.email;
+    const user_email = user.email;
     if (!user_email) {
       return NextResponse.json(
         { error: "User email tidak ditemukan" },
@@ -165,15 +121,11 @@ export async function POST(req: Request) {
       evidence_description,
       evidence_date,
       evidence_job,
-      completion_proof: fileUrl, // bisa null kalau file tidak ada
+      completion_proof: fileUrl,
       evidence_status,
     };
 
-    console.log("Insert payload:", payload);
-
-    const { data, error, status } = await supabase
-      .from("evidence")
-      .insert([payload]);
+    const { data, error } = await supabase.from("evidence").insert([payload]);
 
     if (error) {
       console.error("Supabase insert error:", error);
@@ -184,12 +136,18 @@ export async function POST(req: Request) {
     }
 
     await logActivity({
-      user_name: session.user.name,
-      user_email: user_email,
+      user_name: user.name,
+      user_email,
       activity_type: "evidence",
       activity_name: "Evidence Created",
-      activity_message: `${session.user.name} created evidence "${evidence_title}"`,
+      activity_message: `${user.name} created evidence "${evidence_title}"`,
     });
+
+    // Invalidasi cache bulan sesuai evidence_date
+    const month = getMonthFromDate(evidence_date);
+    const cacheKey = `evidence:${month}`;
+    await redis.del(cacheKey);
+    console.log(`Cache invalidated for key: ${cacheKey}`);
 
     return NextResponse.json(
       { message: "Evidence created successfully", url: fileUrl },

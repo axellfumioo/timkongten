@@ -1,5 +1,4 @@
 'use client'
-import { supabase } from '@/app/lib/supabase'
 import React, { useState, useEffect } from 'react'
 import { useGlobalStore } from '@/app/lib/global-store';
 
@@ -30,37 +29,30 @@ const Calendar = ({ selectedDate, setSelectedDate }: CalendarProps) => {
     const updated = useGlobalStore((state) => state.updated);
     const setUpdated = useGlobalStore((state) => state.setUpdated);
 
-    // Fetch event dari Supabase
+    // Fetch event dari API lokal
     useEffect(() => {
         const fetchEvents = async () => {
-            const { data, error } = await supabase
-                .from('content')
-                .select('content_date, content_title')
-                .gte('content_date', '2025-08-01')
-                .lt('content_date', '2026-12-30');
+            try {
+                const res = await fetch('https://stematelhumas.vercel.app:3000/api/content')
+                const data = await res.json()
 
-            if (error) {
-                console.error('Error fetching events:', error);
-                return;
+                const eventMap: Record<string, string> = {}
+                data.forEach((item: any) => {
+                    if (item.content_date && item.content_title) {
+                        eventMap[item.content_date] = item.content_title
+                    }
+                })
+
+                setEvents(eventMap)
+            } catch (error) {
+                console.error('Error fetching events:', error)
             }
-
-            const eventMap: Record<string, string> = {};
-            data?.forEach((item) => {
-                if (item.content_date && item.content_title) {
-                    eventMap[item.content_date] = item.content_title;
-                }
-            });
-
-            setEvents(eventMap);
-        };
-
-        // Panggil saat mount & saat updated = true
-        if (updated) {
-            fetchEvents();
-            setUpdated(false);
         }
-        fetchEvents();
-    }, [updated]);
+
+        fetchEvents()
+        setUpdated(false)
+    }, [updated, setUpdated])
+
 
     const getDaysInMonth = (year: number, month: number) =>
         new Date(year, month + 1, 0).getDate()

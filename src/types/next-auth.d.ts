@@ -6,19 +6,29 @@ declare module "next-auth" {
     user: {
       name: string;
       email: string;
-      image?: string;
+      image: string;
       role: string;
       allowed?: boolean; // tambahan custom flag
     };
   }
 
   interface User extends DefaultUser {
-    role?: string;
+    name: string;
+    email: string;
+    role: string;
+    image: string;
+    role: string;
+    allowed?: boolean; // tambahan custom flag
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT extends DefaultJWT {
     role: string;
+    name: string;
+    email: string;
+    image: string;
+    role: string;
+    allowed?: boolean; // tambahan custom flag
   }
 }

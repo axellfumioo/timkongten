@@ -1,24 +1,60 @@
 import { supabase } from "@/app/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/lib/auth"; // pastikan ini ada
 import { logActivity } from "@/app/lib/logActivity";
+import Redis from "ioredis";
+import { authOptions } from "@/app/lib/authOptions";
+
+const redis = new Redis(process.env.REDIS_URL!);
+
+const CACHE_TTL = 60 * 5; // 5 menit biar gak basi tapi juga gak stale terlalu lama
 
 // GET: Ambil semua content
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   const user = session?.user;
 
   if (!user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const { data, error } = await supabase
-    .from("content")
-    .select("*")
-    .order("created_at", { ascending: false });
+
+  const { searchParams } = new URL(req.url);
+  const date = searchParams.get("date"); // format: YYYY-MM-DD
+
+  // cache key unik per user + date
+  const cacheKey = `content:${user.email}:${date || "all"}`;
+
+  try {
+    // cek cache dulu
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return NextResponse.json(JSON.parse(cached));
+    }
+  } catch (err) {
+    console.error("Redis GET failed:", err);
+  }
+
+  let query = supabase.from("content").select("*");
+
+  if (date) {
+    query = query
+      .gte("content_date", `${date}T00:00:00`)
+      .lte("content_date", `${date}T23:59:59`);
+  }
+
+  query = query.order("created_at", { ascending: false });
+
+  const { data, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  try {
+    // simpan ke redis biar next request lebih cepat
+    await redis.setex(cacheKey, CACHE_TTL, JSON.stringify(data));
+  } catch (err) {
+    console.error("Redis SETEX failed:", err);
   }
 
   return NextResponse.json(data);
@@ -42,7 +78,6 @@ export async function POST(req: NextRequest) {
     content_date,
   } = body;
 
-  // Insert content baru
   const { data: contentData, error: contentError } = await supabase
     .from("content")
     .insert([
@@ -71,9 +106,6 @@ export async function POST(req: NextRequest) {
     activity_message: `Created new content titled "${content_title}" scheduled for ${content_date}`,
   });
 
-  // Fetch evidence setelah insert content
-  // Asumsikan /api/evidence endpoint bisa diakses di server dengan base url sama
-  // Insert evidence ke table evidence di Supabase
   const { data: evidenceData, error: evidenceError } = await supabase
     .from("evidence")
     .insert([
@@ -89,9 +121,7 @@ export async function POST(req: NextRequest) {
     .select();
 
   if (evidenceError) {
-    console.error(
-      `Insert evidence failed: ${evidenceError.message}`
-    );
+    console.error(`Insert evidence failed: ${evidenceError.message}`);
     return NextResponse.json(
       {
         content: contentData,
@@ -101,11 +131,28 @@ export async function POST(req: NextRequest) {
     );
   }
 
-    return NextResponse.json(
-      {
-        content: contentData,
-        evidence: evidenceData,
-      },
-      { status: 201 }
-    );
+  // invalidate redis cache
+  try {
+    // invalidate bulanan evidence
+    const month = new Date(content_date).toISOString().slice(5, 7);
+    await redis.del(`evidence:${month}`);
+
+    // invalidate content per user (semua key yang match user.email)
+    const keys = await redis.keys(`content:${user.email}:*`);
+    if (keys.length > 0) {
+      await redis.del(keys);
+    }
+
+    console.log(`Redis invalidated for user ${user.email}`);
+  } catch (err) {
+    console.error("Redis invalidate failed:", err);
+  }
+
+  return NextResponse.json(
+    {
+      content: contentData,
+      evidence: evidenceData,
+    },
+    { status: 201 }
+  );
 }

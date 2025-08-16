@@ -335,19 +335,9 @@ const ContentModalCOC = ({ isOpen, onClose, selectedContent }: ContentModalProps
                 </div>
 
                 {/* Actions */}
-                <div className="md:col-span-2 flex items-center justify-end gap-3 pt-2">
-                    {selectedContent && !isEditMode && (
-                        <button
-                            type="button"
-                            onClick={() => handleDelete(selectedContent.id)}
-                            className="flex items-center gap-2 bg-red-600 px-5 py-2.5 rounded-md text-sm font-medium hover:bg-red-700 text-white transition"
-                        >
-                            <TrashIcon size={16} /> Hapus
-                        </button>
-                    )}
-
+                <div className="md:col-span-2 flex items-center justify-between flex-row-reverse gap-3 pt-2">
                     {isEditMode ? (
-                        <>
+                        <div className='flex items-center justify-end gap-3'>
                             <button
                                 type="button"
                                 onClick={() => {
@@ -375,15 +365,24 @@ const ContentModalCOC = ({ isOpen, onClose, selectedContent }: ContentModalProps
                             >
                                 <Save size={16} /> Simpan
                             </button>
-                        </>
+                        </div>
                     ) : (
-                        <button
-                            type="button"
-                            onClick={() => setIsEditMode(true)}
-                            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-white/20 hover:bg-white/30 text-white transition"
-                        >
-                            <Pencil size={16} /> Edit
-                        </button>
+                        <>
+                            <button
+                                type="button"
+                                onClick={() => setIsEditMode(true)}
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-white/20 hover:bg-white/30 text-white transition"
+                            >
+                                <Pencil size={16} /> Edit
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleDelete(selectedContent.id)}
+                                className="flex items-center gap-2 bg-red-600 px-5 py-2.5 rounded-md text-sm font-medium hover:bg-red-700 text-white transition"
+                            >
+                                <TrashIcon size={16} /> Hapus
+                            </button>
+                        </>
                     )}
 
                 </div>

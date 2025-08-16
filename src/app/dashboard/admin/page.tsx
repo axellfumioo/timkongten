@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import Sidebar from '@/components/dashboard/common/Sidebar';
 import UserManagement from '@/components/dashboard/admin/UserManagement';
 import ActivityLog from '@/components/dashboard/admin/ActivityLog';
+import EvidenceTable from '@/components/dashboard/admin/EvidenceTable';
 const settingsTabs = ['User Management', 'Point Approval', 'Activity Logs', 'Site Settings'];
 
 
@@ -54,6 +55,9 @@ function App() {
                         )}
                         {activeTab === 'Activity Logs' && (
                             <ActivityLog/>
+                        )}
+                        {activeTab === 'Point Approval' && (
+                            <EvidenceTable/>
                         )}
                     </div>
                 </main>
