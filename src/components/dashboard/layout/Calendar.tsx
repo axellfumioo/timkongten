@@ -33,7 +33,7 @@ const Calendar = ({ selectedDate, setSelectedDate }: CalendarProps) => {
     useEffect(() => {
         const fetchEvents = async () => {
             try {
-                const res = await fetch('https://stematelhumas.vercel.app:3000/api/content')
+                const res = await fetch('https://stematelhumas.vercel.app/api/content')
                 const data = await res.json()
 
                 const eventMap: Record<string, string> = {}
