@@ -9,7 +9,7 @@ export async function logActivity(data: {
   activity_url?: string;
 }) {
   try {
-    const res = await fetch(`${process.env.BASE_URL}/api/activity-log`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/activity-log`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
