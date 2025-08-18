@@ -25,9 +25,9 @@ function getCacheKeyByMonth(dateStr: string) {
  */
 export async function GET(
   req: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = context.params; // ✅ works for Next 13/14 stable
+  const { id } = await params; // ✅ must await in Next.js 15
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
