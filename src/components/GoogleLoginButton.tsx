@@ -38,7 +38,7 @@ export default function GoogleLoginButton() {
     if (online) {
       setLoading(true)
       signIn('google', {
-        callbackUrl: `${process.env.BASE_URL}/api/auth/callback/google`,
+        callbackUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/callback/google`,
         redirect: true
       })
     }
