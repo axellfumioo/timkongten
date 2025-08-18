@@ -21,8 +21,11 @@ function getMonthFromDate(dateStr: string): string {
 /**
  * GET Evidence by ID
  */
-export async function GET(req: NextRequest, context: { params: { id: string } }) {
-  const { id } = context.params;
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
@@ -61,8 +64,11 @@ export async function GET(req: NextRequest, context: { params: { id: string } })
 /**
  * PUT / Update Evidence by ID
  */
-export async function PUT(req: NextRequest, context: { params: { id: string } }) {
-  const { id } = context.params;
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
@@ -113,8 +119,11 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
 /**
  * DELETE Evidence by ID
  */
-export async function DELETE(req: NextRequest, context: { params: { id: string } }) {
-  const { id } = context.params;
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
@@ -151,8 +160,11 @@ export async function DELETE(req: NextRequest, context: { params: { id: string }
 /**
  * PATCH Evidence Status by ID
  */
-export async function PATCH(req: NextRequest, context: { params: { id: string } }) {
-  const { id } = context.params;
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
