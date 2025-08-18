@@ -54,15 +54,13 @@ export async function GET(req: NextRequest) {
 
     const summaryStyle = { size: 11, bold: true };
     worksheet.addRow([`User: ${user}`]).font = summaryStyle;
-    worksheet
-      .addRow([
-        `Date Range: ${formatDate(start_date)} to ${formatDate(end_date)}`,
-      ])
-      .font = { size: 11 };
+    worksheet.addRow([
+      `Date Range: ${formatDate(start_date)} to ${formatDate(end_date)}`,
+    ]).font = { size: 11 };
     worksheet.addRow([`Total Evidence: ${totalEvidence}`]).font = { size: 11 };
-    worksheet
-      .addRow([`Accepted Evidence: ${acceptedCount}`])
-      .font = { size: 11 };
+    worksheet.addRow([`Accepted Evidence: ${acceptedCount}`]).font = {
+      size: 11,
+    };
     worksheet.addRow([]); // spasi kosong
 
     // ========================
@@ -127,12 +125,15 @@ export async function GET(req: NextRequest) {
     // ========================
     // Auto-fit kolom
     // ========================
-    worksheet.columns.forEach((col) => {
+    worksheet.columns?.forEach((col) => {
+      if (!col) return;
       let maxLength = 0;
-      col.eachCell({ includeEmpty: true }, (cell) => {
-        const cellValue = cell.value ? cell.value.toString() : "";
+
+      col.eachCell?.({ includeEmpty: true }, (cell) => {
+        const cellValue = cell.value ? String(cell.value) : "";
         maxLength = Math.max(maxLength, cellValue.length);
       });
+
       col.width = Math.min(maxLength + 2, 50);
     });
 

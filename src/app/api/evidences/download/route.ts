@@ -48,8 +48,9 @@ export async function GET(req: NextRequest) {
     titleCell.font = { bold: true, size: 14 };
     titleCell.alignment = { horizontal: "center" };
 
-    worksheet.addRow([`Date Range: ${formatDate(start_date)} to ${formatDate(end_date)}`])
-      .font = { size: 11 };
+    worksheet.addRow([
+      `Date Range: ${formatDate(start_date)} to ${formatDate(end_date)}`,
+    ]).font = { size: 11 };
     worksheet.addRow([]); // spasi kosong
 
     // ========================
@@ -73,11 +74,7 @@ export async function GET(req: NextRequest) {
     });
 
     Object.entries(groupedByUser).forEach(([email, stats]) => {
-      const newRow = worksheet.addRow([
-        email,
-        stats.total,
-        stats.accepted,
-      ]);
+      const newRow = worksheet.addRow([email, stats.total, stats.accepted]);
       styleDataRow(newRow);
     });
 
@@ -124,12 +121,16 @@ export async function GET(req: NextRequest) {
     // ========================
     // Auto-fit kolom
     // ========================
-    worksheet.columns.forEach((col) => {
+    worksheet.columns?.forEach((col) => {
+      if (!col) return; // skip undefined columns
+
       let maxLength = 0;
-      col.eachCell({ includeEmpty: true }, (cell) => {
-        const cellValue = cell.value ? cell.value.toString() : "";
+
+      col.eachCell?.({ includeEmpty: true }, (cell) => {
+        const cellValue = cell.value ? String(cell.value) : "";
         maxLength = Math.max(maxLength, cellValue.length);
       });
+
       col.width = Math.min(maxLength + 2, 50);
     });
 
