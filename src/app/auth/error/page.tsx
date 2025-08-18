@@ -1,10 +1,10 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { AlertCircle, ArrowLeft } from 'lucide-react'
 
-// Fungsi untuk sanitize input
 function escapeHTML(input: string): string {
   return input
     .replace(/&/g, '&amp;')
@@ -14,7 +14,6 @@ function escapeHTML(input: string): string {
     .replace(/'/g, '&#039;')
 }
 
-// Pesan error berdasarkan kode
 const errorMessages: Record<string, string> = {
   AccessDenied:
     'Akun Anda tidak terdaftar sebagai anggota Tim Konten. Hubungi humas untuk mendapatkan akses.',
@@ -22,15 +21,22 @@ const errorMessages: Record<string, string> = {
     'Terjadi kesalahan konfigurasi sistem. Tim kami telah diberitahu.',
 }
 
+export const dynamic = "force-dynamic"; // <--- tambahin ini
+
 export default function AuthErrorPage() {
   const searchParams = useSearchParams()
-  const rawError = searchParams.get('error') || ''
-  const sanitizedError = escapeHTML(rawError)
+  const [errorMessage, setErrorMessage] = useState('')
 
-  const errorMessage =
-    rawError in errorMessages
-      ? errorMessages[rawError]
-      : `Terjadi kesalahan saat proses otentikasi. Silakan coba lagi. (${sanitizedError})`
+  useEffect(() => {
+    const rawError = searchParams.get('error') || ''
+    const sanitizedError = escapeHTML(rawError)
+
+    setErrorMessage(
+      rawError in errorMessages
+        ? errorMessages[rawError]
+        : `Terjadi kesalahan saat proses otentikasi. Silakan coba lagi. (${sanitizedError})`
+    )
+  }, [searchParams])
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-zinc-950 via-zinc-900 to-black px-4 relative overflow-hidden">
@@ -45,7 +51,6 @@ export default function AuthErrorPage() {
         className="w-full max-w-md"
       >
         <div className="bg-[#1a1a1a] rounded-xl shadow-2xl overflow-hidden border border-[#2a2a2a]">
-          {/* Content */}
           <div className="p-6">
             <div className="flex items-start mb-6">
               <div className="flex-shrink-0">
@@ -72,7 +77,6 @@ export default function AuthErrorPage() {
             </motion.div>
           </div>
 
-          {/* Footer */}
           <div className="bg-[#1a1a1a] px-6 py-4 border-t border-[#2a2a2a]">
             <p className="text-xs text-gray-500 text-center">
               Butuh bantuan atau terjadi kesalahan?{' '}
