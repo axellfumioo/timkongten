@@ -7,7 +7,7 @@ import { authOptions } from "@/app/lib/authOptions";
 
 const redis = new Redis(process.env.REDIS_URL!);
 const CACHE_PREFIX = "content:";
-const CACHE_EXPIRE_SECONDS = 600; // 5 menit
+const CACHE_EXPIRE_SECONDS = 600; // 10 menit
 
 function getCacheKeyByMonth(dateStr: string) {
   if (!dateStr) throw new Error("Date is required for cache key");
@@ -15,8 +15,9 @@ function getCacheKeyByMonth(dateStr: string) {
   if (parts.length < 2) throw new Error("Invalid date format");
   const month = parts[1].padStart(2, "0");
   if (!/^\d{2}$/.test(month)) throw new Error("Invalid month format");
-  if (parseInt(month) < 1 || parseInt(month) > 12)
+  if (parseInt(month) < 1 || parseInt(month) > 12) {
     throw new Error("Month out of range");
+  }
   return `${CACHE_PREFIX}${month}`;
 }
 
@@ -27,12 +28,13 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params; // ✅ must await in Next.js 15
+  const { id } = await params;
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
-  if (!user?.email)
+  if (!user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   // Ambil content_date dari DB
   const { data: contentData, error: fetchError } = await supabase
@@ -41,10 +43,11 @@ export async function GET(
     .eq("id", id)
     .single();
 
-  if (fetchError || !contentData)
+  if (fetchError || !contentData) {
     return NextResponse.json({ error: "Content not found" }, { status: 404 });
+  }
 
-  let cacheKey;
+  let cacheKey: string;
   try {
     cacheKey = getCacheKeyByMonth(contentData.content_date);
   } catch {
@@ -69,8 +72,9 @@ export async function GET(
     .eq("id", id)
     .single();
 
-  if (error)
+  if (error) {
     return NextResponse.json({ error: error.message }, { status: 404 });
+  }
 
   // Update cache bulan
   let monthCache: any[] = cached ? JSON.parse(cached) : [];
@@ -93,11 +97,10 @@ export async function GET(
  */
 export async function DELETE(
   req: NextRequest,
-  context: { params: Record<string, string> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = context.params.id;
+  const { id } = await params;
 
-  // Auth check
   const session = await getServerSession(authOptions);
   const user = session?.user;
   if (!user?.email) {
@@ -138,7 +141,7 @@ export async function DELETE(
     return NextResponse.json({ error: deleteError.message }, { status: 500 });
   }
 
-  // Log aktivitas async (jangan tunggu)
+  // Log aktivitas async
   logActivity({
     user_name: user.name,
     user_email: user.email,
@@ -163,14 +166,15 @@ export async function DELETE(
  */
 export async function PUT(
   req: NextRequest,
-  context: { params: Record<string, string> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = context.params.id;
+  const { id } = await params;
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
-  if (!user?.email)
+  if (!user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const body = await req.json();
   const {
@@ -189,7 +193,7 @@ export async function PUT(
     );
   }
 
-  let cacheKey;
+  let cacheKey: string;
   try {
     cacheKey = getCacheKeyByMonth(content_date);
   } catch {
@@ -213,8 +217,9 @@ export async function PUT(
       .eq("id", id)
       .select();
 
-    if (error)
+    if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     await logActivity({
       user_name: user.name,
