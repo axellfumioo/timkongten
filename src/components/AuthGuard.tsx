@@ -1,28 +1,26 @@
-"use client"
+"use client";
 
-import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
-export const runtime = "edge";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 interface AuthGuardProps {
-  children: React.ReactNode
+  children: React.ReactNode;
 }
 
 export default function AuthGuard({ children }: AuthGuardProps) {
-  const { data: session, status } = useSession()
-  const router = useRouter()
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
-  // 🚀 Redirect lebih cepat, tanpa re-render aneh
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.replace("/")
+      router.replace("/"); // safety net
     }
-  }, [status, router])
+  }, [status, router]);
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] text-white px-4">
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] text-white">
         <div className="text-center space-y-4">
           <div className="relative w-14 h-14 mx-auto">
             <div className="absolute inset-0 rounded-full border-4 border-white border-t-transparent animate-spin"></div>
@@ -33,13 +31,8 @@ export default function AuthGuard({ children }: AuthGuardProps) {
           </p>
         </div>
       </div>
-    )
+    );
   }
 
-  if (status === "authenticated" && session?.user) {
-    return <>{children}</>
-  }
-
-  // 🚀 Pas "unauthenticated", useEffect bakal jalan → sini jangan render apa2
-  return null
+  return <>{children}</>;
 }
