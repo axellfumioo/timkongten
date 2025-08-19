@@ -7,33 +7,7 @@ import { useState, useEffect } from "react";
 export default function GoogleLoginButton() {
   const [loading, setLoading] = useState(false);
   const [online, setOnline] = useState(true)
-
-  const checkConnection = async () => {
-    try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 3000) // Timeout 3 detik
-
-      const res = await fetch('https://accounts.google.com', {
-        mode: 'no-cors',
-        signal: controller.signal,
-      })
-
-      clearTimeout(timeout)
-      setOnline(true)
-    } catch (error) {
-      setOnline(false)
-    }
-  }
-
-  useEffect(() => {
-    checkConnection()
-
-    const interval = setInterval(() => {
-      checkConnection()
-    }, 3000) // Cek setiap 3 detik
-
-    return () => clearInterval(interval)
-  }, [])
+  
   const handleGoogleSignIn = () => {
     if (online) {
       setLoading(true)
@@ -73,7 +47,6 @@ export default function GoogleLoginButton() {
           className="flex items-center justify-center gap-3 px-5 py-3 w-full border rounded-xl shadow-md hover:shadow-lg active:shadow-sm transition-shadow duration-200 cursor-pointer
         bg-white border-gray-200 text-gray-700
         dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100"
-          onClick={checkConnection}
           disabled={true}
         >
 

@@ -6,16 +6,15 @@ import Sidebar from '@/components/dashboard/common/Sidebar';
 import UserManagement from '@/components/dashboard/admin/UserManagement';
 import ActivityLog from '@/components/dashboard/admin/ActivityLog';
 import EvidenceTable from '@/components/dashboard/admin/EvidenceTable';
+import AuthGuard from '@/components/AuthGuard';
 const settingsTabs = ['User Management', 'Point Approval', 'Activity Logs', 'Site Settings'];
 
 
 function App() {
     const [sidebarOpen, setSidebarOpen] = useState(false)
     const [activeTab, setActiveTab] = useState('User Management')
-    const [showPassword, setShowPassword] = useState(false)
-    const [showCurrentPassword, setShowCurrentPassword] = useState(false)
-
     return (
+        <AuthGuard>
         <div className="flex h-screen bg-[#0a0a0a] text-white font-inter">
             <Sidebar />
 
@@ -74,6 +73,7 @@ function App() {
                 />
             )}
         </div>
+            </AuthGuard>
     )
 }
 

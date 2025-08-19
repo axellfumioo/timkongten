@@ -148,14 +148,14 @@ export default function EvidenceTable() {
       const formattedStart = new Date(startDate).toISOString().split("T")[0] // YYYY-MM-DD
       const formattedEnd = new Date(endDate).toISOString().split("T")[0]
 
-      url = `https://stematelhumas.vercel.app/api/evidences/download/user?user=${encodeURIComponent(
+      url = `${process.env.NEXT_PUBLIC_BASE_URL}/api/evidences/download/user?user=${encodeURIComponent(
         selectedUser
       )}&start_date=${formattedStart}&end_date=${formattedEnd}`
     } else {
       const formattedStart = new Date(startDate).toISOString().split("T")[0]
       const formattedEnd = new Date(endDate).toISOString().split("T")[0]
 
-      url = `https://stematelhumas.vercel.app/api/evidences/download?start_date=${formattedStart}&end_date=${formattedEnd}`
+      url = `${process.env.NEXT_PUBLIC_BASE_URL}/api/evidences/download?start_date=${formattedStart}&end_date=${formattedEnd}`
     }
 
     window.open(url, "_blank")
