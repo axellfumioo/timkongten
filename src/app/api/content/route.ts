@@ -40,7 +40,7 @@ export async function GET(req: Request) {
   let query = supabase
     .from("content")
     // ambil field penting aja
-    .select("id, content_title, content_date, content_category, created_at")
+    .select("id, content_title, content_date, content_category, created_at, user_name")
     .order("created_at", { ascending: false })
     .limit(limit);
 
