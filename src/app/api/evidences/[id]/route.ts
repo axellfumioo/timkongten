@@ -2,12 +2,11 @@ import { supabase } from "@/app/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { logActivity } from "@/app/lib/logActivity";
-import Redis from "ioredis";
+import redis from "@/app/lib/redis";
 import { authOptions } from "@/app/lib/authOptions";
 import { randomUUID } from "crypto";
 import { uploadToR2 } from "@/app/lib/uploadToR2";
 
-const redis = new Redis(process.env.REDIS_URL!);
 const CACHE_PREFIX = "evidence:";
 const CACHE_EXPIRE_SECONDS = 600;
 

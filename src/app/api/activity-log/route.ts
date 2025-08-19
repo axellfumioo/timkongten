@@ -2,16 +2,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { supabase } from "@/app/lib/supabase";
-import Redis from "ioredis";
+import redis from "@/app/lib/redis";
 import { authOptions } from "@/app/lib/authOptions";
 
-// Use connection pooling and pipeline for Redis
-const redis = new Redis(process.env.REDIS_URL!, {
-  maxRetriesPerRequest: 2,
-  connectTimeout: 1000,
-  commandTimeout: 2000,
-  lazyConnect: true,
-});
 
 const CACHE_EXPIRE_SECONDS = 900; // 15 minutes
 const CACHE_PREFIX = 'al:';

@@ -1,18 +1,49 @@
 import Redis from "ioredis";
 
-let redis: Redis;
-
-// Singleton Redis biar gak reconnect tiap request
-if (!(global as any)._redis) {
-  (global as any)._redis = new Redis(process.env.REDIS_URL!, {
-    maxRetriesPerRequest: 3,
-    enableReadyCheck: true,
-    connectTimeout: 10000,
-    tls: process.env.REDIS_URL?.startsWith("rediss://")
-      ? { rejectUnauthorized: true }
-      : undefined,
-  });
+declare global {
+  // Prevent multiple Redis instances in dev (Next.js hot reload problem)
+  // eslint-disable-next-line no-var
+  var redis: Redis | undefined;
 }
 
-redis = (global as any)._redis;
+let redis: Redis;
+
+if (!global.redis) {
+  const primaryUrl = process.env.REDIS_URL_PRIMARY || "redis://localhost:6379";
+  const secondaryUrl =
+    process.env.REDIS_URL_SECONDARY || "redis://localhost:6380";
+
+  // Try primary first
+  const client = new Redis(primaryUrl, {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  });
+
+  // Attach error & failover handling
+  client.on("error", (err) => {
+    console.error("[Redis] Primary connection error:", err.message);
+  });
+
+  client.on("end", () => {
+    console.warn("[Redis] Primary disconnected. Switching to secondary...");
+
+    if (!global.redis || global.redis.options.host === client.options.host) {
+      const fallback = new Redis(secondaryUrl, {
+        maxRetriesPerRequest: null,
+        enableReadyCheck: false,
+      });
+
+      fallback.on("error", (err) => {
+        console.error("[Redis] Secondary connection error:", err.message);
+      });
+
+      global.redis = fallback;
+    }
+  });
+
+  global.redis = client;
+}
+
+redis = global.redis;
+
 export default redis;

@@ -3,12 +3,10 @@ import { NextResponse } from "next/server";
 import { uploadToR2 } from "@/app/lib/uploadToR2";
 import { randomUUID } from "crypto";
 import { getServerSession } from "next-auth";
-
 import { logActivity } from "@/app/lib/logActivity";
-import Redis from "ioredis";
+import redis from "@/app/lib/redis";
 import { authOptions } from "@/app/lib/authOptions";
 
-const redis = new Redis(process.env.REDIS_URL!);
 const CACHE_EXPIRE_SECONDS = 600; // 2 jam cache
 
 // Helper dapetin bulan format MM dari tanggal yyyy-mm-dd
