@@ -14,24 +14,13 @@ export default function AuthGuard({ children }: AuthGuardProps) {
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.replace("/"); // safety net
+      router.replace("/"); // extra safety, user yg bypass client
     }
   }, [status, router]);
 
   if (status === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] text-white">
-        <div className="text-center space-y-4">
-          <div className="relative w-14 h-14 mx-auto">
-            <div className="absolute inset-0 rounded-full border-4 border-white border-t-transparent animate-spin"></div>
-            <div className="absolute inset-2 rounded-full bg-[#0a0a0a]"></div>
-          </div>
-          <p className="text-lg font-medium tracking-wide animate-pulse text-white/80">
-            Loading, please wait...
-          </p>
-        </div>
-      </div>
-    );
+    // ⚡ optional, bisa dihilangin kalau mau no flash
+    return null;
   }
 
   return <>{children}</>;
