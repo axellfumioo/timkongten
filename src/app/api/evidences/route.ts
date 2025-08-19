@@ -7,7 +7,7 @@ import { logActivity } from "@/app/lib/logActivity";
 import redis from "@/app/lib/redis";
 import { authOptions } from "@/app/lib/authOptions";
 
-const CACHE_EXPIRE_SECONDS = 600; // 2 jam cache
+const CACHE_EXPIRE_SECONDS = 1800;
 
 // Helper dapetin bulan format MM dari tanggal yyyy-mm-dd
 function getMonthFromDate(dateStr: string): string {

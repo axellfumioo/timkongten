@@ -5,7 +5,7 @@ import { logActivity } from "@/app/lib/logActivity";
 import redis from "@/app/lib/redis";
 import { authOptions } from "@/app/lib/authOptions";
 
-const CACHE_TTL = 60 * 5; // 5 menit biar gak basi tapi juga gak stale terlalu lama
+const CACHE_TTL = 60 * 30; // 5 menit biar gak basi tapi juga gak stale terlalu lama
 
 // GET: Ambil semua content
 export async function GET(req: Request) {

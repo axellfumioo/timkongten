@@ -5,7 +5,7 @@ import { validateUser } from "@/app/lib/validateUser";
 import { logActivity } from "@/app/lib/logActivity";
 import redis from "@/app/lib/redis";
 
-const CACHE_TTL = 60 * 10; // 10 menit
+const CACHE_TTL = 60 * 30; // 10 menit
 const redisKey = (email: string) => `user:${email}`;
 
 async function getCachedUserData(email: string) {

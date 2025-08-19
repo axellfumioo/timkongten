@@ -6,7 +6,7 @@ import redis from "@/app/lib/redis";
 import { authOptions } from "@/app/lib/authOptions";
 
 const CACHE_PREFIX = "content:";
-const CACHE_EXPIRE_SECONDS = 600; // 10 menit
+const CACHE_EXPIRE_SECONDS = 1800; // 10 menit
 
 function getCacheKeyByMonth(dateStr: string) {
   if (!dateStr) throw new Error("Date is required for cache key");

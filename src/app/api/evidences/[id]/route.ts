@@ -8,7 +8,7 @@ import { randomUUID } from "crypto";
 import { uploadToR2 } from "@/app/lib/uploadToR2";
 
 const CACHE_PREFIX = "evidence:";
-const CACHE_EXPIRE_SECONDS = 600;
+const CACHE_EXPIRE_SECONDS = 1800;
 
 // Helper ambil bulan format MM dari tanggal yyyy-mm-dd
 function getMonthFromDate(dateString: string) {
