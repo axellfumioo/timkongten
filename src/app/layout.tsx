@@ -7,7 +7,7 @@ import { useState } from "react";
 import Toast from "typescript-toastify";
 import { useGlobalStore } from "./lib/global-store";
 import ContentModal from "@/components/dashboard/layout/contentModal";
-import { Save } from "lucide-react";
+import { Save, Loader2 } from "lucide-react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,6 +34,8 @@ export default function RootLayout({
     content_date: "",
   });
 
+  const [loading, setLoading] = useState(false);
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   }
@@ -45,6 +47,7 @@ export default function RootLayout({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setLoading(true);
 
     const isEmpty = Object.values(formData).some((val) => val.trim() === "");
 
@@ -60,6 +63,7 @@ export default function RootLayout({
         type: "error",
         theme: "dark"
       });
+      setLoading(false);
       return;
     }
 
@@ -108,7 +112,10 @@ export default function RootLayout({
         theme: "dark"
       });
     }
+
+    setLoading(false);
   }
+
   return (
     <html lang="en" >
       <head>
@@ -263,14 +270,28 @@ export default function RootLayout({
                   type="button"
                   onClick={() => setModalOpen(false)}
                   className="px-5 py-2.5 rounded-lg text-sm font-medium bg-white/10 text-white hover:bg-white/20 transition"
+                  disabled={loading}
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="flex gap-2 items-center px-5 py-2.5 rounded-lg text-sm font-medium bg-white/20 hover:bg-white/30 text-white transition"
+                  disabled={loading}
+                  className={`flex gap-2 items-center px-5 py-2.5 rounded-lg text-sm font-medium text-white transition ${
+                    loading
+                      ? "bg-white/10 cursor-not-allowed"
+                      : "bg-white/20 hover:bg-white/30"
+                  }`}
                 >
-                  <Save size={16} /> Simpan
+                  {loading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Menyimpan...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} /> Simpan
+                    </>
+                  )}
                 </button>
               </div>
             </div>

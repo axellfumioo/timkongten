@@ -303,7 +303,7 @@ export default function EvidenceTable() {
                   <option value="">-- Pilih User --</option>
                   {users.map((user) => (
                     <option key={user.id} value={user.email} className="bg-gray-800 text-white">
-                      {user.name}
+                      {user.name} ({user.email})
                     </option>
                   ))}
                 </select>

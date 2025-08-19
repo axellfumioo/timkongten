@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Save, Pencil, TrashIcon, UploadCloud, Check, Copy, Image } from 'lucide-react'
+import { Save, Pencil, TrashIcon, UploadCloud, Check, Copy, Image, Loader2 } from 'lucide-react'
 import ContentModal from '@/components/dashboard/layout/contentModal'
 import Toast from 'typescript-toastify'
 import { useGlobalStore } from '@/app/lib/global-store'
@@ -23,7 +23,10 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [loading, setLoading] = useState(false)
     const [proofUrl, setProofUrl] = useState<string | null>(null)
+    const [isSubmitting, setIsSubmitting] = useState(false) // untuk submit
+    const [isDeleting, setIsDeleting] = useState(false) // untuk delete
     const setUpdated = useGlobalStore(state => state.setUpdated)
+
 
     useEffect(() => {
         if (!selectedEvidence) {
@@ -74,6 +77,7 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
+        setIsSubmitting(true)
 
         const form = new FormData()
         Object.entries(formData).forEach(([key, value]) => {
@@ -82,23 +86,29 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
 
         const method = selectedEvidence ? 'PUT' : 'POST'
         const url = selectedEvidence ? `/api/evidences/${selectedEvidence.id}` : '/api/evidences'
-        const response = await fetch(url, { method, body: form })
 
-        if (response.ok) {
-            new Toast({
-                position: 'top-right',
-                toastMsg: selectedEvidence ? 'Berhasil menyimpan evidence!' : 'Berhasil menambahkan evidence!',
-                autoCloseTime: 3000,
-                showProgress: true,
-                pauseOnHover: true,
-                pauseOnFocusLoss: true,
-                type: 'success',
-                theme: 'dark',
-            })
-            setIsEditMode(false)
-            setUpdated(true)
-            onClose()
-        } else {
+        try {
+            const response = await fetch(url, { method, body: form })
+
+            if (response.ok) {
+                new Toast({
+                    position: 'top-right',
+                    toastMsg: selectedEvidence ? 'Berhasil menyimpan evidence!' : 'Berhasil menambahkan evidence!',
+                    autoCloseTime: 3000,
+                    showProgress: true,
+                    pauseOnHover: true,
+                    pauseOnFocusLoss: true,
+                    type: 'success',
+                    theme: 'dark',
+                })
+                setIsEditMode(false)
+                setUpdated(true)
+                onClose()
+            } else {
+                throw new Error('Gagal menyimpan')
+            }
+        } catch (err) {
+            console.error(err)
             new Toast({
                 position: 'top-right',
                 toastMsg: selectedEvidence ? 'Gagal menyimpan perubahan!' : 'Gagal menambahkan evidence!',
@@ -109,25 +119,36 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
                 type: 'error',
                 theme: 'dark',
             })
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
+
     async function handleDelete(id: any) {
-        const response = await fetch(`/api/evidences/${id}`, { method: 'DELETE' })
-        if (response.ok) {
-            new Toast({
-                position: 'top-right',
-                toastMsg: 'Berhasil menghapus!',
-                autoCloseTime: 3000,
-                showProgress: true,
-                pauseOnHover: true,
-                pauseOnFocusLoss: true,
-                type: 'success',
-                theme: 'dark',
-            })
-            setUpdated(true)
-            onClose()
-        } else {
+        if (!id) return
+        setIsDeleting(true)
+
+        try {
+            const response = await fetch(`/api/evidences/${id}`, { method: 'DELETE' })
+            if (response.ok) {
+                new Toast({
+                    position: 'top-right',
+                    toastMsg: 'Berhasil menghapus!',
+                    autoCloseTime: 3000,
+                    showProgress: true,
+                    pauseOnHover: true,
+                    pauseOnFocusLoss: true,
+                    type: 'success',
+                    theme: 'dark',
+                })
+                setUpdated(true)
+                onClose()
+            } else {
+                throw new Error('Gagal menghapus')
+            }
+        } catch (err) {
+            console.error(err)
             new Toast({
                 position: 'top-right',
                 toastMsg: 'Gagal menghapus!',
@@ -138,8 +159,11 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
                 type: 'warning',
                 theme: 'dark',
             })
+        } finally {
+            setIsDeleting(false)
         }
     }
+
 
     return (
         <ContentModal isOpen={isOpen} onClose={onClose}>
@@ -320,9 +344,10 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
                                 </button>
                                 <button
                                     type="submit"
+                                    disabled={isSubmitting}
                                     className="px-5 py-2.5 rounded-lg text-sm font-medium bg-white/20 text-white hover:bg-white/30 flex items-center gap-2"
                                 >
-                                    <Save size={16} /> Simpan
+                                    {isSubmitting ? <><Loader2 size={16} className="animate-spin" /> Menyimpan...</> : <><Save size={16} /> Simpan</>}
                                 </button>
                             </div>
                         ) : (
@@ -337,9 +362,10 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
                                 <button
                                     type="button"
                                     onClick={() => handleDelete(selectedEvidence?.id)}
+                                    disabled={isDeleting}
                                     className="px-5 py-2.5 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 flex items-center gap-2"
                                 >
-                                    <TrashIcon size={16} /> Hapus
+                                    {isDeleting ? <><Loader2 size={16} className="animate-spin" /> Menghapus...</> : <><TrashIcon size={16} /> Hapus</>}
                                 </button>
                             </>
                         )}

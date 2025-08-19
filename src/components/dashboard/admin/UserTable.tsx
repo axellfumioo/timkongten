@@ -20,15 +20,21 @@ export default function UserTable({ setSelectedUser, setModalOpen }: any) {
   const [isLoading, setIsLoading] = useState(false)
   const [userToDelete, setUserToDelete] = useState<User | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [loadingDelete, setLoadingDelete] = useState(false);
 
   const updated = useGlobalStore((state) => state.updated)
   const setUpdated = useGlobalStore((state) => state.setUpdated)
 
   const confirmDelete = async () => {
+    setLoadingDelete(true);
     if (!userToDelete) return
-    await supabase.from('users').delete().eq('id', userToDelete.id)
-    setUpdated(true)
-    setUserToDelete(null)
+    try {
+      await supabase.from('users').delete().eq('id', userToDelete.id)
+      setUpdated(true)
+      setUserToDelete(null)
+    } finally {
+      setLoadingDelete(false);
+    }
   }
 
   useEffect(() => {
@@ -131,7 +137,13 @@ export default function UserTable({ setSelectedUser, setModalOpen }: any) {
         title="Hapus pengguna"
         description={`Yakin ingin menghapus ${userToDelete?.name}? Aksi ini tidak bisa dibatalkan.`}
         onConfirm={confirmDelete}
-        confirmLabel="Hapus"
+        confirmLabel={
+          loadingDelete ? (
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          ) : (
+            "Hapus"
+          )
+        }
         cancelLabel="Batal"
       />
 

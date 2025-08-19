@@ -10,7 +10,7 @@ interface ConfirmationModalProps {
     title: string;
     description: string;
     onConfirm: () => void;
-    confirmLabel: string;
+    confirmLabel: React.ReactNode;
     cancelLabel: string | null;
 }
 

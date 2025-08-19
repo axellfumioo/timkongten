@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Check, Copy, Pencil, Save, TrashIcon, X } from 'lucide-react'
+import { Check, Copy, Loader2, Pencil, Save, TrashIcon, X } from 'lucide-react'
 import ContentModal from '@/components/dashboard/layout/contentModal'
 import Toast from 'typescript-toastify'
 import { useGlobalStore } from '@/app/lib/global-store'
@@ -20,6 +20,8 @@ const ContentModalCOC = ({ isOpen, onClose, selectedContent }: ContentModalProps
         content_date: "",
     })
     const [isEditMode, setIsEditMode] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
+    const [isSubmit, setIsSubmit] = useState(false)
     const [copied, setCopied] = useState(false)
     const setUpdated = useGlobalStore(state => state.setUpdated);
 
@@ -60,21 +62,98 @@ const ContentModalCOC = ({ isOpen, onClose, selectedContent }: ContentModalProps
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
-        if (!selectedContent) {
-            // Tambah baru (POST)
-            const response = await fetch('/api/content', {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ...formData,
-                    created_at: new Date().toISOString(),
-                }),
-            })
+        setIsSubmit(true)
+        try {
+            if (!selectedContent) {
+                // Tambah baru (POST)
+                const response = await fetch('/api/content', {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ...formData,
+                        created_at: new Date().toISOString(),
+                    }),
+                })
 
+                if (response.ok) {
+                    new Toast({
+                        position: "top-right",
+                        toastMsg: "Berhasil menambahkan konten baru!",
+                        autoCloseTime: 3000,
+                        showProgress: true,
+                        pauseOnHover: true,
+                        pauseOnFocusLoss: true,
+                        type: "success",
+                        theme: "dark",
+                    })
+                    onClose()
+                    setUpdated(true)
+                } else {
+                    new Toast({
+                        position: "top-right",
+                        toastMsg: "Gagal menambahkan konten!",
+                        autoCloseTime: 3000,
+                        showProgress: true,
+                        pauseOnHover: true,
+                        pauseOnFocusLoss: true,
+                        type: "error",
+                        theme: "dark",
+                    })
+                }
+            } else {
+                // Edit (PUT)
+                const response = await fetch(`/api/content/${selectedContent.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        ...formData,
+                        created_at: new Date().toISOString(),
+                    }),
+                })
+
+                if (response.ok) {
+                    new Toast({
+                        position: "top-right",
+                        toastMsg: "Berhasil menyimpan konten!",
+                        autoCloseTime: 3000,
+                        showProgress: true,
+                        pauseOnHover: true,
+                        pauseOnFocusLoss: true,
+                        type: "success",
+                        theme: "dark",
+                    })
+                    setIsEditMode(false)
+                    setUpdated(true)
+                } else {
+                    new Toast({
+                        position: "top-right",
+                        toastMsg: "Gagal menyimpan perubahan!",
+                        autoCloseTime: 3000,
+                        showProgress: true,
+                        pauseOnHover: true,
+                        pauseOnFocusLoss: true,
+                        type: "error",
+                        theme: "dark",
+                    })
+                }
+            }
+        } finally {
+            setIsSubmit(false)
+        }
+    }
+
+    async function handleDelete(id: any) {
+        setIsDeleting(true)
+        const response = await fetch(`/api/content/${id}`, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+        })
+
+        try {
             if (response.ok) {
                 new Toast({
                     position: "top-right",
-                    toastMsg: "Berhasil menambahkan konten baru!",
+                    toastMsg: "Berhasil menghapus!",
                     autoCloseTime: 3000,
                     showProgress: true,
                     pauseOnHover: true,
@@ -87,84 +166,17 @@ const ContentModalCOC = ({ isOpen, onClose, selectedContent }: ContentModalProps
             } else {
                 new Toast({
                     position: "top-right",
-                    toastMsg: "Gagal menambahkan konten!",
+                    toastMsg: "Gagal menghapus!",
                     autoCloseTime: 3000,
                     showProgress: true,
                     pauseOnHover: true,
                     pauseOnFocusLoss: true,
-                    type: "error",
+                    type: "warning",
                     theme: "dark",
                 })
             }
-        } else {
-            // Edit (PUT)
-            const response = await fetch(`/api/content/${selectedContent.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ...formData,
-                    created_at: new Date().toISOString(),
-                }),
-            })
-
-            if (response.ok) {
-                new Toast({
-                    position: "top-right",
-                    toastMsg: "Berhasil menyimpan konten!",
-                    autoCloseTime: 3000,
-                    showProgress: true,
-                    pauseOnHover: true,
-                    pauseOnFocusLoss: true,
-                    type: "success",
-                    theme: "dark",
-                })
-                setIsEditMode(false)
-                setUpdated(true)
-            } else {
-                new Toast({
-                    position: "top-right",
-                    toastMsg: "Gagal menyimpan perubahan!",
-                    autoCloseTime: 3000,
-                    showProgress: true,
-                    pauseOnHover: true,
-                    pauseOnFocusLoss: true,
-                    type: "error",
-                    theme: "dark",
-                })
-            }
-        }
-    }
-
-    async function handleDelete(id: any) {
-        const response = await fetch(`/api/content/${id}`, {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-        })
-
-        if (response.ok) {
-            new Toast({
-                position: "top-right",
-                toastMsg: "Berhasil menghapus!",
-                autoCloseTime: 3000,
-                showProgress: true,
-                pauseOnHover: true,
-                pauseOnFocusLoss: true,
-                type: "success",
-                theme: "dark",
-            })
-            onClose()
-            setUpdated(true)
-        } else {
-            new Toast({
-                position: "top-right",
-                toastMsg: "Gagal menghapus!",
-                autoCloseTime: 3000,
-                showProgress: true,
-                pauseOnHover: true,
-                pauseOnFocusLoss: true,
-                type: "warning",
-                theme: "dark",
-            })
+        } finally {
+            setIsDeleting(false)
         }
     }
 
@@ -363,7 +375,15 @@ const ContentModalCOC = ({ isOpen, onClose, selectedContent }: ContentModalProps
                                 type="submit"
                                 className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-white/20 hover:bg-white/30 text-white transition"
                             >
-                                <Save size={16} /> Simpan
+                                {isSubmit ? (
+                                    <>
+                                        <Loader2 size={16} className="animate-spin" /> Menyimpan...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save size={16} /> Simpan
+                                    </>
+                                )}
                             </button>
                         </div>
                     ) : (
@@ -380,7 +400,15 @@ const ContentModalCOC = ({ isOpen, onClose, selectedContent }: ContentModalProps
                                 onClick={() => handleDelete(selectedContent.id)}
                                 className="flex items-center gap-2 bg-red-600 px-5 py-2.5 rounded-md text-sm font-medium hover:bg-red-700 text-white transition"
                             >
-                                <TrashIcon size={16} /> Hapus
+                                {isDeleting ? (
+                                    <>
+                                        <Loader2 size={16} className="animate-spin" /> Menghapus...
+                                    </>
+                                ) : (
+                                    <>
+                                        <TrashIcon size={16} /> Hapus
+                                    </>
+                                )}
                             </button>
                         </>
                     )}

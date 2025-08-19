@@ -11,10 +11,10 @@ const CACHE_PREFIX = "evidence:";
 const CACHE_EXPIRE_SECONDS = 600;
 
 // Helper ambil bulan format MM dari tanggal yyyy-mm-dd
-function getMonthFromDate(dateStr: string): string {
-  if (!dateStr) return "all";
-  const parts = dateStr.split("-");
-  return parts[1]?.padStart(2, "0") || "all";
+function getMonthFromDate(dateString: string) {
+  const date = new Date(dateString);
+  const month = date.getMonth() + 1; // getMonth() dari 0-11
+  return month.toString().padStart(2, "0"); // jadi '08' untuk Agustus
 }
 
 /**
@@ -28,7 +28,8 @@ export async function GET(
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
-  if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user?.email)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data, error } = await supabase
     .from("evidence")
@@ -36,15 +37,19 @@ export async function GET(
     .eq("id", id)
     .single();
 
-  if (error || !data) return NextResponse.json({ error: "Evidence not found" }, { status: 404 });
+  if (error || !data)
+    return NextResponse.json({ error: "Evidence not found" }, { status: 404 });
 
   const month = getMonthFromDate(data.evidence_date);
-  const cacheKey = `${CACHE_PREFIX}${month}`;
+  const cacheKey = `${CACHE_PREFIX}${user.email}:${month}`;
+
 
   const cached = await redis.get(cacheKey);
   if (cached) {
     const cachedData = JSON.parse(cached);
-    const found = Array.isArray(cachedData) ? cachedData.find((item: any) => item.id === id) : null;
+    const found = Array.isArray(cachedData)
+      ? cachedData.find((item: any) => item.id === id)
+      : null;
     if (found) return NextResponse.json(found);
   }
 
@@ -71,7 +76,8 @@ export async function PUT(
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
-  if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user?.email)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const formData = await req.formData();
   const evidence_title = formData.get("evidence_title") as string;
@@ -83,7 +89,11 @@ export async function PUT(
     .eq("id", id)
     .single();
 
-  if (fetchErr || !oldData) return NextResponse.json({ error: fetchErr?.message || "Not found" }, { status: 404 });
+  if (fetchErr || !oldData)
+    return NextResponse.json(
+      { error: fetchErr?.message || "Not found" },
+      { status: 404 }
+    );
 
   const month = getMonthFromDate(oldData.evidence_date);
   let fileUrl = oldData.completion_proof || null;
@@ -91,8 +101,16 @@ export async function PUT(
   if (completion_proof && completion_proof.name) {
     const fileExt = completion_proof.name.split(".").pop();
     const filename = `${randomUUID()}.${fileExt}`;
-    fileUrl = await uploadToR2(completion_proof, filename, process.env.R2_BUCKET!);
-    if (!fileUrl) return NextResponse.json({ error: "Failed uploading file" }, { status: 500 });
+    fileUrl = await uploadToR2(
+      completion_proof,
+      filename,
+      process.env.R2_BUCKET!
+    );
+    if (!fileUrl)
+      return NextResponse.json(
+        { error: "Failed uploading file" },
+        { status: 500 }
+      );
   }
 
   const { error } = await supabase
@@ -100,7 +118,8 @@ export async function PUT(
     .update({ evidence_title, completion_proof: fileUrl })
     .eq("id", id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
 
   await logActivity({
     user_name: user.name,
@@ -110,7 +129,7 @@ export async function PUT(
     activity_message: `${user.name} updated evidence "${evidence_title}"`,
   });
 
-  await redis.del(`${CACHE_PREFIX}${month}`);
+  await redis.del(`${CACHE_PREFIX}${user.email}:${month}`);
 
   return NextResponse.json({ message: "Evidence updated successfully" });
 }
@@ -126,32 +145,34 @@ export async function DELETE(
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
-  if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user?.email)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data: evidenceData, error: getError } = await supabase
     .from("evidence")
-    .select("evidence_title,evidence_date")
+    .select("user_email,evidence_title,evidence_date")
     .eq("id", id)
     .single();
 
   const month = getMonthFromDate(evidenceData?.evidence_date);
 
-  const { error } = await supabase
-    .from("evidence")
-    .delete()
-    .eq("id", id);
+  const { error } = await supabase.from("evidence").delete().eq("id", id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
 
   await logActivity({
     user_name: user.name,
     user_email: user.email,
     activity_type: "evidence",
     activity_name: "Evidence Deleted",
-    activity_message: `${user.name} deleted evidence "${evidenceData?.evidence_title || id}"`,
+    activity_message: `${user.name} deleted evidence "${
+      evidenceData?.evidence_title || id
+    }"`,
   });
 
-  await redis.del(`${CACHE_PREFIX}${month}`);
+  await redis.del(`${CACHE_PREFIX}${evidenceData?.user_email}:${month}`);
+  // console.log(`OAKWOAKWOWAKOAWKWAOKWAOKAWOKAWOKWAOKWAOWAK | ${CACHE_PREFIX}:${evidenceData?.user_email}:${month}`)
 
   return NextResponse.json({ message: "Evidence deleted successfully" });
 }
@@ -167,18 +188,24 @@ export async function PATCH(
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
-  if (!user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user?.email)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { status } = await req.json();
-  if (!["accepted", "declined"].includes(status)) return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  if (!["accepted", "declined"].includes(status))
+    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
 
   const { data: evidenceData, error: fetchErr } = await supabase
     .from("evidence")
-    .select("evidence_title, evidence_date")
+    .select("user_email, evidence_title, evidence_date")
     .eq("id", id)
     .single();
 
-  if (fetchErr || !evidenceData) return NextResponse.json({ error: fetchErr?.message || "Not found" }, { status: 404 });
+  if (fetchErr || !evidenceData)
+    return NextResponse.json(
+      { error: fetchErr?.message || "Not found" },
+      { status: 404 }
+    );
 
   const month = getMonthFromDate(evidenceData.evidence_date);
 
@@ -187,9 +214,10 @@ export async function PATCH(
     .update({ evidence_status: status })
     .eq("id", id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json({ error: error.message }, { status: 500 });
 
-  await redis.del(`${CACHE_PREFIX}${month}`);
+  await redis.del(`${CACHE_PREFIX}${evidenceData.user_email}:${month}`);
 
   await logActivity({
     user_name: user.name,

@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import {
     Eye, Edit, TrashIcon, Search, CalendarDays, Plus, UploadCloud, BarChart2, Briefcase,
-    Menu
+    Menu,
+    Loader2,
+    Save
 } from 'lucide-react';
 import Sidebar from '@/components/dashboard/common/Sidebar';
 import AuthGuard from '@/components/AuthGuard';
@@ -52,6 +54,8 @@ function EvidenceDashboard() {
     const [selectedContent, setSelectedContent] = useState<any | null>(null)
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [selectedId, setSelectedId] = useState('');
+    const [loadingSubmit, setLoadingSubmit] = useState(false);
+    const [loadingDelete, setLoadingDelete] = useState(false);
 
     // data form
     const [formData, setFormData] = useState({
@@ -108,6 +112,7 @@ function EvidenceDashboard() {
 
     // delete evidence
     const confirmDelete = async (id: any) => {
+        setLoadingDelete(true);
         try {
             const res = await fetch(`/api/evidences/${id}`, {
                 method: "DELETE",
@@ -122,6 +127,8 @@ function EvidenceDashboard() {
             }
         } catch (error) {
             console.error("Error saat menghapus:", error);
+        } finally {
+            setLoadingDelete(false);
         }
     };
 
@@ -186,54 +193,59 @@ function EvidenceDashboard() {
     // submit evidence
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        setLoadingSubmit(true);
 
-        const isEmpty = Object.values(formData).some(
-            (val) => typeof val === 'string' && val.trim() === ''
-        );
-        if (!selectedFile || isEmpty) {
+        try {
+            const isEmpty = Object.values(formData).some(
+                (val) => typeof val === 'string' && val.trim() === ''
+            );
+            if (!selectedFile || isEmpty) {
+                setModalOpen(false);
+                setSelectedFile(null);
+                new Toast({
+                    position: 'top-right',
+                    toastMsg: 'Semua field harus diisi!',
+                    autoCloseTime: 3000,
+                    showProgress: true,
+                    type: 'error',
+                    theme: 'dark',
+                });
+                return;
+            }
+
+            const formPayload = new FormData();
+            formPayload.append('evidence_title', formData.evidence_title);
+            formPayload.append('evidence_description', formData.evidence_description);
+            formPayload.append('evidence_date', formData.evidence_date);
+            formPayload.append('evidence_job', formData.evidence_job);
+            formPayload.append('completion_proof', selectedFile);
+
+            const response = await fetch('/api/evidences', { method: 'POST', body: formPayload });
+
             setModalOpen(false);
-            setSelectedFile(null);
-            new Toast({
-                position: 'top-right',
-                toastMsg: 'Semua field harus diisi!',
-                autoCloseTime: 3000,
-                showProgress: true,
-                type: 'error',
-                theme: 'dark',
-            });
-            return;
-        }
-
-        const formPayload = new FormData();
-        formPayload.append('evidence_title', formData.evidence_title);
-        formPayload.append('evidence_description', formData.evidence_description);
-        formPayload.append('evidence_date', formData.evidence_date);
-        formPayload.append('evidence_job', formData.evidence_job);
-        formPayload.append('completion_proof', selectedFile);
-
-        const response = await fetch('/api/evidences', { method: 'POST', body: formPayload });
-
-        setModalOpen(false);
-        if (response.ok) {
-            setFormData({ evidence_title: '', evidence_description: '', evidence_date: '', evidence_job: '' });
-            setSelectedFile(null);
-            new Toast({
-                position: 'top-right',
-                toastMsg: 'Berhasil menyimpan!',
-                autoCloseTime: 3000,
-                type: 'success',
-                theme: 'dark',
-            });
-            fetchEvidences();
-        } else {
-            setSelectedFile(null);
-            new Toast({
-                position: 'top-right',
-                toastMsg: 'Gagal menyimpan!',
-                autoCloseTime: 3000,
-                type: 'error',
-                theme: 'dark',
-            });
+            if (response.ok) {
+                setFormData({ evidence_title: '', evidence_description: '', evidence_date: '', evidence_job: '' });
+                setSelectedFile(null);
+                new Toast({
+                    position: 'top-right',
+                    toastMsg: 'Berhasil menyimpan!',
+                    autoCloseTime: 3000,
+                    type: 'success',
+                    theme: 'dark',
+                });
+                fetchEvidences();
+            } else {
+                setSelectedFile(null);
+                new Toast({
+                    position: 'top-right',
+                    toastMsg: 'Gagal menyimpan!',
+                    autoCloseTime: 3000,
+                    type: 'error',
+                    theme: 'dark',
+                });
+            }
+        } finally {
+            setLoadingSubmit(false);
         }
     }
 
@@ -371,10 +383,20 @@ function EvidenceDashboard() {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-5 py-2.5 rounded-lg text-sm font-medium bg-white/20 hover:bg-white/30 transition text-white"
+                                    disabled={loadingSubmit}
+                                    className="px-5 py-2.5 rounded-lg text-sm font-medium bg-white/20 hover:bg-white/30 transition text-white flex items-center gap-2"
                                 >
-                                    Simpan
+                                    {loadingSubmit ? (
+                                        <>
+                                            <Loader2 size={16} className="animate-spin" /> Menyimpan...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Save size={16} /> Simpan
+                                        </>
+                                    )}
                                 </button>
+
                             </div>
                         </form>
                     </ContentModal>
@@ -647,7 +669,13 @@ function EvidenceDashboard() {
                         confirmDelete(userToDelete?.id)
                         setConfirmOpen(false)
                     }}
-                    confirmLabel="Hapus"
+                    confirmLabel={
+                        loadingDelete ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                            "Hapus"
+                        )
+                    }
                     cancelLabel="Batal"
                 />
             </div>

@@ -31,7 +31,7 @@ export async function GET(req: Request) {
   const currentMonth = String(new Date().getMonth() + 1).padStart(2, "0");
   const evidenceMonth = monthParam ? monthParam.padStart(2, "0") : currentMonth;
 
-  const cacheKey = `evidence:${userauth.email}:${evidenceMonth}`;
+  const cacheKey = `evidence:${user}:${evidenceMonth}`;
 
   // Cek cache
   const cachedData = await redis.get(cacheKey);
