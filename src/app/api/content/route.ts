@@ -9,6 +9,8 @@ const CACHE_TTL = 60 * 5; // 5 menit biar gak basi tapi juga gak stale terlalu l
 
 // GET: Ambil semua content
 export async function GET(req: Request) {
+  const totalStart = Date.now();
+
   const session = await getServerSession(authOptions);
   const user = session?.user;
 
@@ -17,22 +19,30 @@ export async function GET(req: Request) {
   }
 
   const { searchParams } = new URL(req.url);
-  const date = searchParams.get("date"); // format: YYYY-MM-DD
+  const date = searchParams.get("date"); // YYYY-MM-DD
+  const limit = parseInt(searchParams.get("limit") || "50"); // default 50 rows
 
-  // cache key unik per user + date
-  const cacheKey = `content:${user.email}:${date || "all"}`;
+  const cacheKey = `content:${user.email}:${date || "all"}:limit:${limit}`;
 
+  // ===== Redis GET =====
+  let cached;
   try {
-    // cek cache dulu
-    const cached = await redis.get(cacheKey);
+    cached = await redis.get(cacheKey);
     if (cached) {
+      console.log(`Redis hit for ${cacheKey}`);
       return NextResponse.json(JSON.parse(cached));
     }
   } catch (err) {
     console.error("Redis GET failed:", err);
   }
 
-  let query = supabase.from("content").select("*");
+  // ===== Supabase Query =====
+  let query = supabase
+    .from("content")
+    // ambil field penting aja
+    .select("id, content_title, content_date, content_category, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
 
   if (date) {
     query = query
@@ -40,20 +50,23 @@ export async function GET(req: Request) {
       .lte("content_date", `${date}T23:59:59`);
   }
 
-  query = query.order("created_at", { ascending: false });
-
+  const dbStart = Date.now();
   const { data, error } = await query;
+  const dbTime = Date.now() - dbStart;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // ===== Redis SETEX =====
   try {
-    // simpan ke redis biar next request lebih cepat
     await redis.setex(cacheKey, CACHE_TTL, JSON.stringify(data));
   } catch (err) {
     console.error("Redis SETEX failed:", err);
   }
+
+  const totalTime = Date.now() - totalStart;
+  console.log(`DB query: ${dbTime}ms, Total GET: ${totalTime}ms`);
 
   return NextResponse.json(data);
 }

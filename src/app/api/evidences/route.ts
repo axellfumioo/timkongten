@@ -17,6 +17,8 @@ function getMonthFromDate(dateStr: string): string {
 }
 
 export async function GET(req: Request) {
+  const totalStart = Date.now();
+
   const session = await getServerSession(authOptions);
   const userauth = session?.user;
 
@@ -33,46 +35,67 @@ export async function GET(req: Request) {
 
   const cacheKey = `evidence:${user}:${evidenceMonth}`;
 
-  // Cek cache
+  // ===== Redis GET =====
+  const redisStart = Date.now();
   const cachedData = await redis.get(cacheKey);
+  const redisTime = Date.now() - redisStart;
   if (cachedData) {
-    console.log(`Cache hit for key: ${cacheKey}`);
     const cachedJson: any[] = JSON.parse(cachedData);
     const acceptedEvidences = cachedJson.filter(
       (item) => item.evidence_status === "accepted"
     ).length;
+    console.log(
+      `Cache hit for ${cacheKey} - ${redisTime}ms, Total GET: ${
+        Date.now() - totalStart
+      }ms`
+    );
     return NextResponse.json({ data: cachedJson, acceptedEvidences });
   }
 
-  // Ambil SEMUA data user
-  let query = supabase.from("evidence").select("*");
+  // ===== Optimized Supabase query =====
+  // Ambil field yang perlu aja + filter bulan di query
+  const monthStart = `${new Date().getFullYear()}-${evidenceMonth}-01`;
+  const monthEndDate = new Date(
+    new Date(monthStart).getFullYear(),
+    new Date(monthStart).getMonth() + 1,
+    0
+  ).getDate();
+  const monthEnd = `${new Date().getFullYear()}-${evidenceMonth}-${monthEndDate}`;
 
-  if (user) {
-    query = query.eq("user_email", user);
-  }
+  let query = supabase
+    .from("evidence")
+    .select("id, evidence_title, evidence_date, evidence_status, created_at")
+    .gte("evidence_date", monthStart)
+    .lte("evidence_date", monthEnd)
+    .order("created_at", { ascending: false });
 
-  const { data, error } = await query.order("created_at", { ascending: false });
+  if (user) query = query.eq("user_email", user);
+
+  const dbStart = Date.now();
+  const { data, error } = await query;
+  const dbTime = Date.now() - dbStart;
 
   if (error) {
     console.error("GET /evidences error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Filter bulan di JS tanpa peduli tahun
-  const rows: any[] = (data || []).filter((item) => {
-    const month = String(new Date(item.evidence_date).getMonth() + 1).padStart(
-      2,
-      "0"
-    );
-    return month === evidenceMonth;
-  });
+  const acceptedEvidences = (data || []).filter(
+    (item) => item.evidence_status === "accepted"
+  ).length;
 
-  const acceptedEvidences =
-    rows.filter((item) => item.evidence_status === "accepted").length || 0;
+  // ===== Redis SETEX =====
+  const redisSetStart = Date.now();
+  await redis.setex(cacheKey, CACHE_EXPIRE_SECONDS, JSON.stringify(data));
+  const redisSetTime = Date.now() - redisSetStart;
 
-  await redis.set(cacheKey, JSON.stringify(rows), "EX", CACHE_EXPIRE_SECONDS);
+  console.log(
+    `DB query: ${dbTime}ms, Redis SETEX: ${redisSetTime}ms, Total GET: ${
+      Date.now() - totalStart
+    }ms`
+  );
 
-  return NextResponse.json({ data: rows, acceptedEvidences });
+  return NextResponse.json({ data, acceptedEvidences });
 }
 
 export async function POST(req: Request) {
