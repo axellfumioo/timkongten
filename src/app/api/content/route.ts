@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
   try {
     // invalidate bulanan evidence
     const month = new Date(content_date).toISOString().slice(5, 7);
-    await redis.del(`evidence:${month}`);
+    await redis.del(`evidence:${user.email}:${month}`);
 
     // invalidate content per user (semua key yang match user.email)
     const keys = await redis.keys(`content:${user.email}:*`);

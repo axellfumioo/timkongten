@@ -31,7 +31,7 @@ export async function GET(req: Request) {
   const currentMonth = String(new Date().getMonth() + 1).padStart(2, "0");
   const evidenceMonth = monthParam ? monthParam.padStart(2, "0") : currentMonth;
 
-  const cacheKey = `evidence:${evidenceMonth}`;
+  const cacheKey = `evidence:${userauth.email}:${evidenceMonth}`;
 
   // Cek cache
   const cachedData = await redis.get(cacheKey);
@@ -143,7 +143,7 @@ export async function POST(req: Request) {
 
     // Invalidasi cache bulan sesuai evidence_date
     const month = getMonthFromDate(evidence_date);
-    const cacheKey = `evidence:${month}`;
+    const cacheKey = `evidence:${user.email}:${month}`;
     await redis.del(cacheKey);
     console.log(`Cache invalidated for key: ${cacheKey}`);
 

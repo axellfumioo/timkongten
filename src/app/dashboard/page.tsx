@@ -10,6 +10,7 @@ import {
 import Sidebar from '@/components/dashboard/common/Sidebar';
 import TodoList from '@/components/dashboard/layout/TodoList';
 import AuthGuard from '@/components/AuthGuard';
+import { useSession } from "next-auth/react";
 
 interface SelectedDate {
   day: number
@@ -35,6 +36,8 @@ function getTodayDate(): SelectedDate {
 function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<SelectedDate>(() => getTodayDate());
+  const { data: session, status } = useSession();
+  const user = session?.user;
   const [stats, setStats] = useState<ContentStats>({
     total: 0,
     yours: 0,
@@ -53,7 +56,6 @@ function App() {
     year: 'numeric',
   });
 
-  // Fetch ke API sesuai tanggal
 
   return (
     <AuthGuard>
@@ -76,7 +78,7 @@ function App() {
           {/* Main Content */}
           <main className="flex-1 px-5 sm:px-10 pt-10 bg-[#0a0a0a] mt-0 md:mt-0 overflow-y-auto">
             <div className="mb-6">
-              <h1 className="text-4xl font-extrabold tracking-tight mb-2">Hey Axel! 😀</h1>
+              <h1 className="text-4xl font-extrabold tracking-tight mb-2">Hey {user?.name?.substring(0, 12)}! 😀</h1>
               <p className="text-white/50 text-lg">
                 Lihat statistik lengkap kamu di halaman ini ({formatted})
               </p>
