@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useGlobalStore } from '@/app/lib/global-store';
 
 type CalendarDay = {
@@ -28,30 +28,34 @@ const Calendar = ({ selectedDate, setSelectedDate }: CalendarProps) => {
     const [events, setEvents] = useState<Record<string, string>>({})
     const updated = useGlobalStore((state) => state.updated);
     const setUpdated = useGlobalStore((state) => state.setUpdated);
+    const fetchEventsRef = useRef(false); // flag supaya cuma fetch 1x
 
-    // Fetch event dari API lokal
     useEffect(() => {
         const fetchEvents = async () => {
             try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/content`)
-                const data = await res.json()
+                const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/content`);
+                const data = await res.json();
 
-                const eventMap: Record<string, string> = {}
+                const eventMap: Record<string, string> = {};
                 data.forEach((item: any) => {
                     if (item.content_date && item.content_title) {
-                        eventMap[item.content_date] = item.content_title
+                        eventMap[item.content_date] = item.content_title;
                     }
-                })
+                });
 
-                setEvents(eventMap)
+                setEvents(eventMap);
             } catch (error) {
-                console.error('Error fetching events:', error)
+                console.error('Error fetching events:', error);
             }
-        }
+        };
 
-        fetchEvents()
-        setUpdated(false)
-    }, [updated, setUpdated])
+        // Cuma fetch kalau belum pernah fetch
+        if (!fetchEventsRef.current || updated) {
+            fetchEvents();
+            fetchEventsRef.current = true; // set flag
+            setUpdated(false); // reset updated
+        }
+    }, [updated, setUpdated]);
 
 
     const getDaysInMonth = (year: number, month: number) =>

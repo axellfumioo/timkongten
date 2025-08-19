@@ -16,6 +16,7 @@ interface ContentEvent {
   content_type: string
   content_caption: string
   content_date: string
+  user_name: string
   users?: {
     name: string
   }
@@ -106,7 +107,7 @@ export default function TodoList() {
                   <p className="text-white/50 mb-2">{task.content_caption}</p>
                   <div className="flex items-center gap-2 text-xs text-white/40">
                     <UserIcon size={14} />
-                    <span>{task.users?.name}</span>
+                    <span>{task.user_name}</span>
                   </div>
                 </div>
                 <div className="relative">
