@@ -6,7 +6,19 @@ import redis from "@/app/lib/redis";
 import { authOptions } from "@/app/lib/authOptions";
 
 const CACHE_TTL = 60 * 30; // 5 menit biar gak basi tapi juga gak stale terlalu lama
+const CACHE_PREFIX = "content:";
 
+function getCacheKeyByMonth(dateStr: string) {
+  if (!dateStr) throw new Error("Date is required for cache key");
+  const parts = dateStr.split("-");
+  if (parts.length < 2) throw new Error("Invalid date format");
+  const month = parts[1].padStart(2, "0");
+  if (!/^\d{2}$/.test(month)) throw new Error("Invalid month format");
+  if (parseInt(month) < 1 || parseInt(month) > 12) {
+    throw new Error("Month out of range");
+  }
+  return `${CACHE_PREFIX}${month}`;
+}
 // GET: Ambil semua content
 export async function GET(req: Request) {
   const totalStart = Date.now();
@@ -14,15 +26,15 @@ export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   const user = session?.user;
 
-  // if (!user?.email) {
-  //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  // }
+  if (!user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const { searchParams } = new URL(req.url);
-  const date = searchParams.get("date"); // YYYY-MM-DD
+  const date = searchParams.get("date") || ""; // YYYY-MM-DD
   const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100); // cap at 100
 
-  const cacheKey = `content:${user?.email}:${date || "all"}:limit:${limit}`;
+  const cacheKey = date ? getCacheKeyByMonth(date) : "content:all";
 
   // ===== Redis GET =====
   let cached;
@@ -159,7 +171,7 @@ export async function POST(req: NextRequest) {
     await redis.del(`evidence:${user.email}:${month}`);
 
     // invalidate content per user (semua key yang match user.email)
-    const keys = await redis.keys(`content:${user.email}:*`);
+    const keys = getCacheKeyByMonth(content_date);
     if (keys.length > 0) {
       await redis.del(keys);
     }
