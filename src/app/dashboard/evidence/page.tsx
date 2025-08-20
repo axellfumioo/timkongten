@@ -592,7 +592,6 @@ function EvidenceDashboard() {
                                     >
                                         {Array.from({ length: 5 }, (_, i) => {
                                             const year = new Date().getFullYear() - 2 + i;
-                                            console.log("Render opsi tahun:", year); // debug saat render opsi
                                             return (
                                                 <option key={year} value={year} className="bg-black text-white">
                                                     {year}

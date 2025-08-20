@@ -14,13 +14,13 @@ export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
   const user = session?.user;
 
-  if (!user?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // if (!user?.email) {
+  //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // }
 
   const { searchParams } = new URL(req.url);
   const date = searchParams.get("date"); // YYYY-MM-DD
-  const limit = parseInt(searchParams.get("limit") || "50"); // default 50 rows
+  const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100); // cap at 100
 
   const cacheKey = `content:${user.email}:${date || "all"}:limit:${limit}`;
 
@@ -39,15 +39,19 @@ export async function GET(req: Request) {
   // ===== Supabase Query =====
   let query = supabase
     .from("content")
-    // ambil field penting aja
-    .select("id, content_title, content_date, content_category, created_at, user_name")
-    .order("created_at", { ascending: false })
-    .limit(limit);
+    .select(
+      "id, content_title, content_date, content_category, created_at, user_name"
+    );
 
   if (date) {
+    // More efficient: filter first, then order and limit
     query = query
-      .gte("content_date", `${date}T00:00:00`)
-      .lte("content_date", `${date}T23:59:59`);
+      .eq("content_date::date", date)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+  } else {
+    // For no date filter, just order and limit
+    query = query.order("created_at", { ascending: false }).limit(limit);
   }
 
   const dbStart = Date.now();
@@ -55,20 +59,26 @@ export async function GET(req: Request) {
   const dbTime = Date.now() - dbStart;
 
   if (error) {
+    console.error("Database error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // ===== Redis SETEX =====
+  // ===== Redis SETEX with different TTL for date queries =====
+  const ttl = date ? CACHE_TTL * 2 : CACHE_TTL; // Cache date-specific queries longer
   try {
-    await redis.setex(cacheKey, CACHE_TTL, JSON.stringify(data));
+    await redis.setex(cacheKey, ttl, JSON.stringify(data || []));
   } catch (err) {
     console.error("Redis SETEX failed:", err);
   }
 
   const totalTime = Date.now() - totalStart;
-  console.log(`DB query: ${dbTime}ms, Total GET: ${totalTime}ms`);
+  console.log(
+    `DB query: ${dbTime}ms, Total GET: ${totalTime}ms, Rows: ${
+      data?.length || 0
+    }`
+  );
 
-  return NextResponse.json(data);
+  return NextResponse.json(data || []);
 }
 
 export async function POST(req: NextRequest) {
