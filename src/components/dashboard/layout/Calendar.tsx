@@ -34,14 +34,15 @@ const Calendar = ({ selectedDate, setSelectedDate }: CalendarProps) => {
         const fetchEvents = async () => {
             try {
                 const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/content`);
-                const data = await res.json();
+                const response = await res.json(); // ini object { data: [...], debug: {...} }
 
                 const eventMap: Record<string, string> = {};
-                data.forEach((item: any) => {
+                response.data.forEach((item: any) => {
                     if (item.content_date && item.content_title) {
                         eventMap[item.content_date] = item.content_title;
                     }
                 });
+
 
                 setEvents(eventMap);
             } catch (error) {

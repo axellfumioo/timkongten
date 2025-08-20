@@ -55,7 +55,8 @@ const App = () => {
         method: 'GET',
       })
       if (!res.ok) throw new Error('Gagal fetch konten')
-      const data = await res.json()
+      const response = await res.json()
+      const data = response.data
       setEvents(Array.isArray(data) ? data : [data]) // handle kalau API ngasih object tunggal
     } catch (err) {
       console.error('Error fetching content:', err)

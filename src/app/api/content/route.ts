@@ -19,6 +19,7 @@ function getCacheKeyByMonth(dateStr: string) {
   }
   return `${CACHE_PREFIX}${month}`;
 }
+
 // GET: Ambil semua content
 export async function GET(req: Request) {
   const totalStart = Date.now();
@@ -34,35 +35,49 @@ export async function GET(req: Request) {
   const date = searchParams.get("date") || ""; // YYYY-MM-DD
   const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100); // cap at 100
 
-  const cacheKey = date ? getCacheKeyByMonth(date) : "content:all";
+  const cacheKey = date ? `content:${date}` : "content:all";
+  let redisHit = false;
 
   // ===== Redis GET =====
   let cached;
+  const redisStart = Date.now();
   try {
     cached = await redis.get(cacheKey);
     if (cached) {
-      console.log(`Redis hit for ${cacheKey}`);
-      return NextResponse.json(JSON.parse(cached));
+      redisHit = true;
+      const redisTime = Date.now() - redisStart;
+      console.log(`Redis hit for ${cacheKey} in ${redisTime}ms`);
+      return NextResponse.json({
+        data: JSON.parse(cached),
+        debug: {
+          cacheKey,
+          redisHit,
+          redisTime,
+          dbTime: 0,
+          totalTime: Date.now() - totalStart,
+          limit,
+          dateFilter: date || "none",
+        },
+      });
     }
   } catch (err) {
     console.error("Redis GET failed:", err);
   }
+  const redisTime = Date.now() - redisStart;
 
   // ===== Supabase Query =====
   let query = supabase
     .from("content")
     .select(
-      "id, content_title, content_date, content_category, created_at, user_name"
+      "id, content_title, content_caption, content_date, content_category, created_at, user_name"
     );
 
   if (date) {
-    // More efficient: filter first, then order and limit
     query = query
       .eq("content_date::date", date)
       .order("created_at", { ascending: false })
       .limit(limit);
   } else {
-    // For no date filter, just order and limit
     query = query.order("created_at", { ascending: false }).limit(limit);
   }
 
@@ -75,8 +90,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // ===== Redis SETEX with different TTL for date queries =====
-  const ttl = date ? CACHE_TTL * 2 : CACHE_TTL; // Cache date-specific queries longer
+  // ===== Redis SETEX =====
+  const ttl = date ? CACHE_TTL * 2 : CACHE_TTL;
   try {
     await redis.setex(cacheKey, ttl, JSON.stringify(data || []));
   } catch (err) {
@@ -90,7 +105,18 @@ export async function GET(req: Request) {
     }`
   );
 
-  return NextResponse.json(data || []);
+  return NextResponse.json({
+    data: data || [],
+    debug: {
+      cacheKey,
+      redisHit,
+      redisTime,
+      dbTime,
+      totalTime,
+      limit,
+      dateFilter: date || "none",
+    },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -169,6 +195,7 @@ export async function POST(req: NextRequest) {
     // invalidate bulanan evidence
     const month = new Date(content_date).toISOString().slice(5, 7);
     await redis.del(`evidence:${user.email}:${month}`);
+    await redis.del(`content:${content_date}`);
 
     // invalidate content per user (semua key yang match user.email)
     const keys = getCacheKeyByMonth(content_date);

@@ -49,8 +49,12 @@ export default function TodoList() {
         const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/content?date=${selectedDateStr}`)
         if (!res.ok) throw new Error('Failed to fetch events')
 
-        const data = await res.json()
-        setEvents(data || [])
+        const response = await res.json()
+
+        // Ambil array dari data.data, fallback ke array kosong
+        const eventsArray = response.data ?? []
+
+        setEvents(eventsArray)
       } catch (error) {
         console.error('Error fetching events:', error)
         setEvents([])
@@ -59,6 +63,7 @@ export default function TodoList() {
         setIsLoading(false)
       }
     }
+
 
     fetchEvents()
   }, [updated, selectedDateStr, setUpdated])

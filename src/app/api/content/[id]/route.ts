@@ -48,7 +48,7 @@ export async function GET(
 
   let cacheKey: string;
   try {
-    cacheKey = getCacheKeyByMonth(contentData.content_date);
+    cacheKey = contentData.content_date;
   } catch {
     return NextResponse.json(
       { error: "Invalid content_date format" },
