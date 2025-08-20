@@ -26,49 +26,6 @@ function getTodayDate(): SelectedDate {
 
 const App = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false)
-    const [selectedDate, setSelectedDate] = useState<SelectedDate>(() => getTodayDate())
-    const [events, setEvents] = useState<any[]>([])
-    const [isLoading, setIsLoading] = useState(false)
-    const [modalOpen, setModalOpen] = useState(false)
-    const [selectedContent, setSelectedContent] = useState<any | null>(null)
-    const setUpdated = useGlobalStore((state) => state.setUpdated)
-    const updated = useGlobalStore((state) => state.updated)
-
-    const dateFormatted = `${selectedDate.year}-${String(selectedDate.month + 1).padStart(2, '0')}-${String(selectedDate.day).padStart(2, '0')}`
-
-    const formattedDateString = new Date(selectedDate.year, selectedDate.month, selectedDate.day).toLocaleDateString('id-ID', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-    })
-
-    const fetchEvents = async () => {
-        setIsLoading(true)
-        const { data, error } = await supabase
-            .from('content')
-            .select('*, users(*)')
-            .eq('content_date', dateFormatted)
-
-        if (error) {
-            console.error('Error fetching content + user:', error)
-        } else {
-            setEvents(data)
-        }
-        setIsLoading(false)
-    }
-
-    useEffect(() => {
-        fetchEvents()
-    }, [dateFormatted])
-
-    useEffect(() => {
-        if (updated) {
-            fetchEvents()
-            // setUpdated(false)
-        }
-    }, [updated, dateFormatted])
-
     return (
         <AuthGuard>
             <div className="flex h-screen bg-[#0a0a0a] text-white">
