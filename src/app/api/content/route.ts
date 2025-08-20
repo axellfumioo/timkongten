@@ -22,7 +22,7 @@ export async function GET(req: Request) {
   const date = searchParams.get("date"); // YYYY-MM-DD
   const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100); // cap at 100
 
-  const cacheKey = `content:${user.email}:${date || "all"}:limit:${limit}`;
+  const cacheKey = `content:${user?.email}:${date || "all"}:limit:${limit}`;
 
   // ===== Redis GET =====
   let cached;
