@@ -10,40 +10,54 @@ let redis: Redis;
 
 if (!global.redis) {
   const primaryUrl = process.env.REDIS_URL_PRIMARY || "redis://localhost:6379";
-  const secondaryUrl =
-    process.env.REDIS_URL_SECONDARY || "redis://localhost:6380";
-
-  // Try primary first
+  
   const client = new Redis(primaryUrl, {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
+    // Essential optimizations
+    connectTimeout: 5000,
+    commandTimeout: 2000,
+    lazyConnect: false,
+    maxRetriesPerRequest: 3,
+    enableReadyCheck: true,
+    family: 4, // Force IPv4
+    enableOfflineQueue: false,
   });
 
-  // Attach error & failover handling
   client.on("error", (err) => {
-    console.error("[Redis] Primary connection error:", err.message);
+    console.error("[Redis] Connection error:", err.message);
   });
 
-  client.on("end", () => {
-    console.warn("[Redis] Primary disconnected. Switching to secondary...");
+  client.on("connect", () => {
+    console.log("[Redis] Connected");
+  });
 
-    if (!global.redis || global.redis.options.host === client.options.host) {
-      const fallback = new Redis(secondaryUrl, {
-        maxRetriesPerRequest: null,
-        enableReadyCheck: false,
-      });
-
-      fallback.on("error", (err) => {
-        console.error("[Redis] Secondary connection error:", err.message);
-      });
-
-      global.redis = fallback;
-    }
+  // Test connection
+  client.ping().catch((err) => {
+    console.error("[Redis] Ping failed:", err.message);
   });
 
   global.redis = client;
 }
 
 redis = global.redis;
+
+// Simple helper for timing operations
+export async function timedRedisOperation<T>(
+  operation: () => Promise<T>,
+  operationName: string
+): Promise<T> {
+  const start = Date.now();
+  try {
+    const result = await operation();
+    const duration = Date.now() - start;
+    if (duration > 100) {
+      console.warn(`[Redis] ${operationName} took ${duration}ms`);
+    }
+    return result;
+  } catch (error) {
+    const duration = Date.now() - start;
+    console.error(`[Redis] ${operationName} failed after ${duration}ms:`, error);
+    throw error;
+  }
+}
 
 export default redis;
