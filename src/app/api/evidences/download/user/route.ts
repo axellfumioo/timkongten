@@ -3,6 +3,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/app/lib/supabase";
 import ExcelJS from "exceljs";
 
+// Tipe data evidence biar TypeScript gak error
+type EvidenceRow = {
+  id: number;
+  user_email: string;
+  content_id: number | null;
+  evidence_title: string | null;
+  evidence_description: string | null;
+  evidence_date: string;
+  evidence_status: string | null;
+  completion_proof: string | null;
+  created_at: string;
+  evidence_job: string | null;
+  users: { name: string | null } | null;
+  content: { content_title: string | null } | null; // ⬅️ tambahan
+};
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -17,14 +33,36 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Ambil data dari Supabase
-    const { data, error } = await supabase
+    // Ambil data dari Supabase, join ke tabel users
+    const { data, error } = (await supabase
       .from("evidence")
-      .select("*")
+      .select(
+        `
+    id,
+    user_email,
+    content_id,
+    evidence_title,
+    evidence_description,
+    evidence_date,
+    evidence_status,
+    completion_proof,
+    created_at,
+    evidence_job,
+    users:user_email (
+      name
+    ),
+    content:content_id (
+      content_title
+    )
+  `
+      )
       .eq("user_email", user)
       .gte("evidence_date", start_date)
       .lte("evidence_date", end_date)
-      .order("evidence_date", { ascending: true });
+      .order("evidence_date", { ascending: true })) as unknown as {
+      data: EvidenceRow[];
+      error: any;
+    };
 
     if (error) {
       console.error(error);
@@ -34,10 +72,20 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    if (!data || data.length === 0) {
+      return NextResponse.json(
+        { error: "No evidence data found" },
+        { status: 404 }
+      );
+    }
+
     const totalEvidence = data.length;
     const acceptedCount = data.filter(
       (ev) => ev.evidence_status === "accepted"
     ).length;
+
+    // Ambil nama user dari hasil relasi Supabase
+    const userName = data[0]?.users?.name ?? user ?? "Unknown User";
 
     // Buat workbook & worksheet
     const workbook = new ExcelJS.Workbook();
@@ -53,7 +101,7 @@ export async function GET(req: NextRequest) {
     titleCell.alignment = { horizontal: "center" };
 
     const summaryStyle = { size: 11, bold: true };
-    worksheet.addRow([`User: ${user}`]).font = summaryStyle;
+    worksheet.addRow([`User: ${userName}`]).font = summaryStyle;
     worksheet.addRow([
       `Date Range: ${formatDate(start_date)} to ${formatDate(end_date)}`,
     ]).font = { size: 11 };
@@ -68,8 +116,8 @@ export async function GET(req: NextRequest) {
     // ========================
     const headers = [
       "ID",
-      "User Email",
-      "Content ID",
+      "User Name",
+      "Content Name",
       "Evidence Title",
       "Evidence Description",
       "Evidence Date",
@@ -101,8 +149,8 @@ export async function GET(req: NextRequest) {
     data.forEach((row) => {
       const newRow = worksheet.addRow([
         row.id,
-        row.user_email,
-        row.content_id ?? "",
+        row.users?.name ?? row.user_email ?? "Unknown User",
+        row.content?.content_title ?? "", // ✅ pake content title
         row.evidence_title ?? "",
         row.evidence_description ?? "",
         formatDate(row.evidence_date),
@@ -141,7 +189,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse(buffer, {
       status: 200,
       headers: {
-        "Content-Disposition": `attachment; filename="evidence_${user}_${start_date}_${end_date}.xlsx"`,
+        "Content-Disposition": `attachment; filename="evidence_${userName}_${start_date}_${end_date}.xlsx"`,
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       },

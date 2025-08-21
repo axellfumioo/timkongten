@@ -64,7 +64,7 @@ export async function GET(req: Request) {
 
   let query = supabase
     .from("evidence")
-    .select("id, evidence_title, evidence_date, evidence_status, created_at")
+    .select("id, evidence_title, evidence_description, evidence_job, evidence_date, evidence_status, created_at")
     .gte("evidence_date", monthStart)
     .lte("evidence_date", monthEnd)
     .order("created_at", { ascending: false });
@@ -120,6 +120,7 @@ export async function POST(req: Request) {
     const evidence_description = formData.get("evidence_description") as string;
     const evidence_date = formData.get("evidence_date") as string;
     const evidence_job = formData.get("evidence_job") as string;
+    const content_id = formData.get("content_id") as string | null;
     const evidence_status = "pending";
     const file = formData.get("completion_proof") as File | null;
 
@@ -142,6 +143,7 @@ export async function POST(req: Request) {
       evidence_description,
       evidence_date,
       evidence_job,
+      content_id,
       completion_proof: fileUrl,
       evidence_status,
     };

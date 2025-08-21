@@ -3,6 +3,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/app/lib/supabase";
 import ExcelJS from "exceljs";
 
+type EvidenceRow = {
+  id: number;
+  user_email: string;
+  content_id: number | null;
+  evidence_title: string | null;
+  evidence_description: string | null;
+  evidence_date: string;
+  evidence_status: string | null;
+  completion_proof: string | null;
+  created_at: string;
+  evidence_job: string | null;
+  users: { name: string } | null; // ⬅️ BUKAN ARRAY
+};
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -16,13 +30,37 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Ambil semua data evidence sesuai range
-    const { data, error } = await supabase
+    // ============================
+    // Ambil semua data evidence + join user name
+    // ============================
+    const { data, error } = (await supabase
       .from("evidence")
-      .select("*")
+      .select(
+        `
+    id,
+    user_email,
+    content_id,
+    evidence_title,
+    evidence_description,
+    evidence_date,
+    evidence_status,
+    completion_proof,
+    created_at,
+    evidence_job,
+    users:user_email (
+      name
+    ),
+    content:content_id (
+      content_title
+    )
+  `
+      )
       .gte("evidence_date", start_date)
       .lte("evidence_date", end_date)
-      .order("evidence_date", { ascending: true });
+      .order("evidence_date", { ascending: true })) as unknown as {
+      data: (EvidenceRow & { content: { content_title: string } | null })[];
+      error: any;
+    };
 
     if (error) {
       console.error(error);
@@ -36,6 +74,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "No data found" }, { status: 404 });
     }
 
+    // ============================
+    // Inisialisasi workbook Excel
+    // ============================
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Evidence Report");
 
@@ -56,7 +97,7 @@ export async function GET(req: NextRequest) {
     // ========================
     // TABLE USER
     // ========================
-    const userHeader = ["User Email", "Total Evidence", "Accepted Evidence"];
+    const userHeader = ["User Name", "Total Evidence", "Accepted Evidence"];
     const userHeaderRow = worksheet.addRow(userHeader);
     styleHeaderRow(userHeaderRow);
 
@@ -64,17 +105,18 @@ export async function GET(req: NextRequest) {
       {};
 
     data.forEach((row) => {
-      if (!groupedByUser[row.user_email]) {
-        groupedByUser[row.user_email] = { total: 0, accepted: 0 };
+      const userName = row.users?.name ?? row.user_email ?? "Unknown User";
+      if (!groupedByUser[userName]) {
+        groupedByUser[userName] = { total: 0, accepted: 0 };
       }
-      groupedByUser[row.user_email].total++;
+      groupedByUser[userName].total++;
       if (row.evidence_status === "accepted") {
-        groupedByUser[row.user_email].accepted++;
+        groupedByUser[userName].accepted++;
       }
     });
 
-    Object.entries(groupedByUser).forEach(([email, stats]) => {
-      const newRow = worksheet.addRow([email, stats.total, stats.accepted]);
+    Object.entries(groupedByUser).forEach(([name, stats]) => {
+      const newRow = worksheet.addRow([name, stats.total, stats.accepted]);
       styleDataRow(newRow);
     });
 
@@ -89,8 +131,8 @@ export async function GET(req: NextRequest) {
 
     const historyHeader = [
       "ID",
-      "User Email",
-      "Content ID",
+      "User Name",
+      "Content Name",
       "Evidence Title",
       "Evidence Description",
       "Evidence Date",
@@ -105,8 +147,8 @@ export async function GET(req: NextRequest) {
     data.forEach((row) => {
       const newRow = worksheet.addRow([
         row.id,
-        row.user_email,
-        row.content_id ?? "",
+        row.users?.name ?? row.user_email ?? "Unknown User",
+        row.content?.content_title ?? "", // ✅ content title
         row.evidence_title ?? "",
         row.evidence_description ?? "",
         formatDate(row.evidence_date),
@@ -122,10 +164,9 @@ export async function GET(req: NextRequest) {
     // Auto-fit kolom
     // ========================
     worksheet.columns?.forEach((col) => {
-      if (!col) return; // skip undefined columns
+      if (!col) return;
 
       let maxLength = 0;
-
       col.eachCell?.({ includeEmpty: true }, (cell) => {
         const cellValue = cell.value ? String(cell.value) : "";
         maxLength = Math.max(maxLength, cellValue.length);

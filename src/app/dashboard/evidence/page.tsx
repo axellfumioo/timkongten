@@ -56,15 +56,35 @@ function EvidenceDashboard() {
     const [selectedId, setSelectedId] = useState('');
     const [loadingSubmit, setLoadingSubmit] = useState(false);
     const [loadingDelete, setLoadingDelete] = useState(false);
+    const [contents, setContents] = useState<any[]>([]);
+    const [loadingContents, setLoadingContents] = useState(false);
 
     // data form
     const [formData, setFormData] = useState({
         evidence_title: '',
+        content_id: '',
         evidence_description: '',
         evidence_date: '',
         evidence_job: '',
     });
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+    const fetchContents = async () => {
+        try {
+            setLoadingContents(true);
+            const res = await fetch('/api/content');
+            if (!res.ok) throw new Error('Gagal fetch konten');
+
+            const data = await res.json();
+            setContents(data.data || []); // Pastikan sesuai format API lu
+        } catch (err) {
+            console.error('Error ambil konten:', err);
+            setContents([]);
+        } finally {
+            setLoadingContents(false);
+        }
+    };
+
 
     // ambil data dari API
     const fetchEvidences = async () => {
@@ -134,14 +154,36 @@ function EvidenceDashboard() {
 
     // jalankan saat pertama load & updated = true
     useEffect(() => {
-        if (status === "authenticated") {
-            fetchEvidences();
-        }
+        fetchEvidences();
+        fetchContents();
+        setUpdated(false);
         if (updated) {
             fetchEvidences();
-            setUpdated(false); // Reset the updated flag after fetching
+            fetchContents();
+            setUpdated(false);
         }
     }, [status, selectedMonth, searchTerm, updated]);
+
+    // helper: bikin grouping + sorting
+    const groupedContents = contents.reduce((acc: Record<string, any[]>, item: any) => {
+        const date = new Date(item.content_date);
+        const month = monthNames[date.getMonth()];
+        const year = date.getFullYear();
+        const group = `${month} ${year}`;
+        if (!acc[group]) acc[group] = [];
+        acc[group].push(item);
+        return acc;
+    }, {});
+
+    // urutin key by date terbaru → lama
+    const sortedGroups = Object.keys(groupedContents).sort((a, b) => {
+        const [monthA, yearA] = a.split(" ");
+        const [monthB, yearB] = b.split(" ");
+        const dateA = new Date(parseInt(yearA), monthNames.indexOf(monthA));
+        const dateB = new Date(parseInt(yearB), monthNames.indexOf(monthB));
+        return dateB.getTime() - dateA.getTime(); // desc
+    });
+
 
     // filter & sort hasil fetch (opsional, kalau mau filter lagi di frontend)
     const statusOrder: Record<EvidenceStatus, number> = {
@@ -218,13 +260,14 @@ function EvidenceDashboard() {
             formPayload.append('evidence_description', formData.evidence_description);
             formPayload.append('evidence_date', formData.evidence_date);
             formPayload.append('evidence_job', formData.evidence_job);
+            formPayload.append('content_id', formData.content_id);
             formPayload.append('completion_proof', selectedFile);
 
             const response = await fetch('/api/evidences', { method: 'POST', body: formPayload });
 
             setModalOpen(false);
             if (response.ok) {
-                setFormData({ evidence_title: '', evidence_description: '', evidence_date: '', evidence_job: '' });
+                setFormData({ evidence_title: '', content_id: '', evidence_description: '', evidence_date: '', evidence_job: '' });
                 setSelectedFile(null);
                 new Toast({
                     position: 'top-right',
@@ -278,15 +321,27 @@ function EvidenceDashboard() {
                             onSubmit={handleSubmit}
                         >
                             {/* Judul Konten */}
-                            <div className="md:col-span-2">
+                            <div className="">
                                 <label className="block text-white font-medium mb-1">Evidence</label>
                                 <input
                                     name="evidence_title"
                                     type="text"
                                     value={formData.evidence_title}
                                     onChange={handleChange}
-                                    placeholder="Masukkan judul konten"
+                                    placeholder="Masukkan judul evidence"
                                     className="w-full rounded-lg border border-white/10 bg-white/5 text-white px-4 py-3 placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 transition"
+                                />
+                            </div>
+
+                            {/* Tanggal Konten */}
+                            <div>
+                                <label className="block text-white font-medium mb-1">Tanggal</label>
+                                <input
+                                    name="evidence_date"
+                                    type="date"
+                                    value={formData.evidence_date}
+                                    onChange={handleChange}
+                                    className="w-full rounded-lg border border-white/10 bg-white/5 text-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-white/20 transition"
                                 />
                             </div>
 
@@ -340,6 +395,33 @@ function EvidenceDashboard() {
 
                             </div>
 
+                            {/* Feedback */}
+                            <div className=''>
+                                <label className="block text-white font-medium mb-1">Calendar Of Content</label>
+                                <select
+                                    name="content_id"
+                                    value={formData.content_id}
+                                    onChange={handleChange}
+                                    className="w-full rounded-lg border border-white/10 bg-white/5 text-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-white/20 transition"
+                                >
+                                    <option className="bg-black text-white" disabled value="">
+                                        {loadingContents ? "Memuat konten..." : "Pilih CoC"}
+                                    </option>
+                                    {sortedGroups.map((monthYear) => (
+                                        <optgroup className="bg-black text-white" key={monthYear} label={monthYear}>
+                                            {groupedContents[monthYear].map((item) => (
+                                                <option
+                                                    key={item.id}
+                                                    value={item.id}
+                                                    className="bg-black text-white"
+                                                >
+                                                    {item.content_title}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    ))}
+                                </select>
+                            </div>
 
                             {/* Feedback */}
                             <div>
@@ -350,7 +432,7 @@ function EvidenceDashboard() {
                                     onChange={handleChange}
                                     className="w-full rounded-lg border border-white/10 bg-white/5 text-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-white/20 transition"
                                 >
-                                    <option className="bg-black text-white" value="">Pilih tugas</option>
+                                    <option className="bg-black text-white" value="" disabled>Pilih tugas</option>
                                     <option className="bg-black text-white" value="Edit/Design Konten">Edit/Design Konten (Feed, Story, WhatsApp)</option>
                                     <option className="bg-black text-white" value="Take Video">Take Video (Video, Reels, TikTok)</option>
                                     <option className="bg-black text-white" value="Content Production">Content Production (Ide, Skrip atau Caption)</option>
@@ -358,18 +440,6 @@ function EvidenceDashboard() {
                                     <option className="bg-black text-white" value="Sosialisasi">(BA) Sosialisasi</option>
                                     <option className="bg-black text-white" value="Lainnya">Lainnya</option>
                                 </select>
-                            </div>
-
-                            {/* Tanggal Konten */}
-                            <div>
-                                <label className="block text-white font-medium mb-1">Tanggal</label>
-                                <input
-                                    name="evidence_date"
-                                    type="date"
-                                    value={formData.evidence_date}
-                                    onChange={handleChange}
-                                    className="w-full rounded-lg border border-white/10 bg-white/5 text-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-white/20 transition"
-                                />
                             </div>
 
                             {/* Tombol Aksi */}

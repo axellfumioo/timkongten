@@ -48,7 +48,7 @@ export async function GET(
 
   let cacheKey: string;
   try {
-    cacheKey = contentData.content_date;
+    cacheKey = `content:${contentData.content_date}`;
   } catch {
     return NextResponse.json(
       { error: "Invalid content_date format" },
@@ -149,10 +149,15 @@ export async function DELETE(
     activity_message: `Removed content titled "${contentData.content_title}" scheduled for ${contentData.content_date}`,
   }).catch(() => {});
 
+  const date = new Date(contentData.content_date);
+  const month = String(date.getMonth() + 1).padStart(2, "0"); // "08"
+
   // Invalidasi cache bulan
   try {
-    await redis.del(cacheKey);
-    console.log("Deleted cache key:", cacheKey);
+    await redis.del(`content:${contentData.content_date}`);
+    await redis.del(`content:all`);
+    await redis.del(`evidence:${user.email}:${month}`);
+    console.log("Deleted cache key:", `evidence:${month}`);
   } catch (cacheError) {
     console.error("Cache invalidation error:", cacheError);
   }
@@ -230,7 +235,7 @@ export async function PUT(
 
     // Invalidasi cache bulan updated content
     try {
-      await redis.del(cacheKey);
+      await redis.del(`content:${content_date}`);
     } catch (cacheError) {
       console.error("Cache invalidation error:", cacheError);
     }

@@ -5,6 +5,8 @@ import { logActivity } from "@/app/lib/logActivity";
 import redis from "@/app/lib/redis";
 import { authOptions } from "@/app/lib/authOptions";
 
+import { randomUUID } from "crypto";
+
 const CACHE_TTL = 60 * 30; // 5 menit biar gak basi tapi juga gak stale terlalu lama
 const CACHE_PREFIX = "content:";
 
@@ -137,10 +139,13 @@ export async function POST(req: NextRequest) {
     content_date,
   } = body;
 
+  const content_id = `${randomUUID()}`;
+
   const { data: contentData, error: contentError } = await supabase
     .from("content")
     .insert([
       {
+        id: content_id,
         user_email: user.email,
         user_name: user.name,
         content_category,
@@ -169,11 +174,12 @@ export async function POST(req: NextRequest) {
     .from("evidence")
     .insert([
       {
-        evidence_title: `Membuat konten`,
-        evidence_description: `Ditugaskan untuk membuat konten "${content_title}"`,
+        evidence_title: `Membuat ide konten`,
+        evidence_description: `Membuat Calendar Of Content pada tanggal "${content_date}" dengan judul "${content_title}"`,
         evidence_date: content_date,
+        content_id: content_id,
         evidence_job: `COC-${content_date}`,
-        evidence_status: "needaction",
+        evidence_status: "accepted",
         user_email: user.email,
       },
     ])
@@ -196,6 +202,7 @@ export async function POST(req: NextRequest) {
     const month = new Date(content_date).toISOString().slice(5, 7);
     await redis.del(`evidence:${user.email}:${month}`);
     await redis.del(`content:${content_date}`);
+    await redis.del(`content:all`);
 
     // invalidate content per user (semua key yang match user.email)
     const keys = getCacheKeyByMonth(content_date);
