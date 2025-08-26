@@ -542,10 +542,14 @@ function EvidenceDashboard() {
                                                                 {/* Title & Description */}
                                                                 <div className="space-y-1">
                                                                     <h3 className="text-lg font-bold text-white truncate">
-                                                                        {item.title}
+                                                                        {item.title.length > 80
+                                                                            ? item.title.slice(0, 60) + "..."
+                                                                            : item.title}
                                                                     </h3>
                                                                     <p className="text-sm text-white/70 line-clamp-2 leading-relaxed">
-                                                                        {item.description}
+                                                                        {item.description.length > 92
+                                                                            ? item.description.slice(0, 92) + "..."
+                                                                            : item.description}
                                                                     </p>
                                                                 </div>
 
