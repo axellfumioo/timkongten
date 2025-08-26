@@ -129,8 +129,8 @@ export async function POST(req: NextRequest) {
 
   const content_id = randomUUID();
 
-  // run supabase inserts and logging in parallel
-  const contentInsert = supabase
+  // Insert content dulu, tunggu hasilnya
+  const { data: contentData, error: contentError } = await supabase
     .from("content")
     .insert([
       {
@@ -147,15 +147,12 @@ export async function POST(req: NextRequest) {
     ])
     .select();
 
-  const logAct = logActivity({
-    user_name: user.name,
-    user_email: user.email,
-    activity_type: "content",
-    activity_name: "Content Create",
-    activity_message: `Created new content titled "${content_title}" scheduled for ${content_date}`,
-  });
+  if (contentError) {
+    return NextResponse.json({ error: contentError.message }, { status: 500 });
+  }
 
-  const evidenceInsert = supabase
+  // Insert evidence setelah content berhasil
+  const { data: evidenceData, error: evidenceError } = await supabase
     .from("evidence")
     .insert([
       {
@@ -170,33 +167,27 @@ export async function POST(req: NextRequest) {
     ])
     .select();
 
-  const [contentRes, evidenceRes] = await Promise.all([
-    contentInsert,
-    evidenceInsert,
-    logAct,
-  ]);
-
-  if (contentRes.error) {
+  if (evidenceError) {
+    console.error(`Insert evidence failed: ${evidenceError.message}`);
     return NextResponse.json(
-      { error: contentRes.error.message },
+      { content: contentData, evidenceError: evidenceError.message },
       { status: 500 }
     );
   }
 
-  if (evidenceRes.error) {
-    console.error(`Insert evidence failed: ${evidenceRes.error.message}`);
-    return NextResponse.json(
-      {
-        content: contentRes.data,
-        evidenceError: evidenceRes.error.message,
-      },
-      { status: 500 }
-    );
-  }
-
-  // invalidate redis asynchronously, don't block response
+  // Logging dan Redis bisa jalan async, nggak blocking
   (async () => {
     try {
+      // Logging activity
+      await logActivity({
+        user_name: user.name,
+        user_email: user.email,
+        activity_type: "content",
+        activity_name: "Content Create",
+        activity_message: `Created new content titled "${content_title}" scheduled for ${content_date}`,
+      });
+
+      // Redis invalidation
       const month = new Date(content_date).toISOString().slice(5, 7);
       await redis.del(`evidence:${user.email}:${month}`);
       await redis.del(`content:${content_date}`);
@@ -207,14 +198,14 @@ export async function POST(req: NextRequest) {
 
       console.log(`Redis invalidated for user ${user.email}`);
     } catch (err) {
-      console.error("Redis invalidate failed:", err);
+      console.error("Async tasks failed:", err);
     }
   })();
 
   return NextResponse.json(
     {
-      content: contentRes.data,
-      evidence: evidenceRes.data,
+      content: contentData,
+      evidence: evidenceData,
     },
     { status: 201 }
   );

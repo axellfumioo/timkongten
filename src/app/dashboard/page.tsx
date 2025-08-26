@@ -63,7 +63,7 @@ function App() {
 
     const fetchStats = async () => {
       try {
-        const response = await fetch(`/api/stats?date=${selectedDate.year}-${selectedDate.month + 1}-${selectedDate.day}`);
+        const response = await fetch(`/api/stats`);
         if (!response.ok) throw new Error("Failed to fetch stats");
         const data = await response.json();
 
