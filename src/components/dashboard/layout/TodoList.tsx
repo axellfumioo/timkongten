@@ -46,7 +46,7 @@ export default function TodoList() {
     const fetchEvents = async () => {
       setIsLoading(true)
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}api/content?date=${selectedDateStr}`)
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/content?date=${selectedDateStr}`)
         if (!res.ok) throw new Error('Failed to fetch events')
 
         const response = await res.json()
