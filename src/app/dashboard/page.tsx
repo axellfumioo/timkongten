@@ -56,15 +56,6 @@ function App() {
     year: 'numeric',
   });
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      const res = await fetch('/api/content');
-      if (!res.ok) throw new Error('Failed to fetch stats');
-    };
-
-    fetchStats();
-  }, []); // [] artinya cuma jalan sekali pas mount
-
   return (
     <AuthGuard>
       <div className="flex h-screen bg-[#0a0a0a] text-white">

@@ -51,7 +51,7 @@ const App = () => {
   const fetchEvents = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/content?date=${dateFormatted}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}api/content?date=${dateFormatted}`, {
         method: 'GET',
       })
       if (!res.ok) throw new Error('Gagal fetch konten')

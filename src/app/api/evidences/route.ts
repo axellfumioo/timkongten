@@ -64,7 +64,9 @@ export async function GET(req: Request) {
 
   let query = supabase
     .from("evidence")
-    .select("id, evidence_title, evidence_description, evidence_job, evidence_date, evidence_status, created_at")
+    .select(
+      "id, evidence_title, evidence_description, evidence_job, evidence_date, evidence_status, created_at"
+    )
     .gte("evidence_date", monthStart)
     .lte("evidence_date", monthEnd)
     .order("created_at", { ascending: false });
@@ -109,32 +111,29 @@ export async function POST(req: Request) {
     }
 
     const user_email = user.email;
-    if (!user_email) {
-      return NextResponse.json(
-        { error: "User email tidak ditemukan" },
-        { status: 400 }
-      );
-    }
 
     const evidence_title = formData.get("evidence_title") as string;
     const evidence_description = formData.get("evidence_description") as string;
     const evidence_date = formData.get("evidence_date") as string;
     const evidence_job = formData.get("evidence_job") as string;
     const content_id = formData.get("content_id") as string | null;
-    const evidence_status = "pending";
     const file = formData.get("completion_proof") as File | null;
 
-    let fileUrl: string | null = null;
+    let fileUploadPromise: Promise<string | null> = Promise.resolve(null);
     if (file && file.name) {
       const fileExt = file.name.split(".").pop();
       const filename = `${randomUUID()}.${fileExt}`;
-      fileUrl = await uploadToR2(file, filename, process.env.R2_BUCKET!);
-      if (!fileUrl) {
-        return NextResponse.json(
-          { error: "Gagal mengunggah file ke R2" },
-          { status: 500 }
-        );
-      }
+      fileUploadPromise = uploadToR2(file, filename, process.env.R2_BUCKET!);
+    }
+
+    // Wait for file upload
+    const fileUrl = await fileUploadPromise;
+
+    if (file && !fileUrl) {
+      return NextResponse.json(
+        { error: "Gagal mengunggah file ke R2" },
+        { status: 500 }
+      );
     }
 
     const payload = {
@@ -145,32 +144,34 @@ export async function POST(req: Request) {
       evidence_job,
       content_id,
       completion_proof: fileUrl,
-      evidence_status,
+      evidence_status: "pending",
     };
 
-    const { data, error } = await supabase.from("evidence").insert([payload]);
+    // Run Supabase insert, log activity, and cache deletion concurrently
+    const month = getMonthFromDate(evidence_date);
+    const cacheKey = `evidence:${user.email}:${month}`;
 
-    if (error) {
-      console.error("Supabase insert error:", error);
+    const [insertResult] = await Promise.all([
+      supabase.from("evidence").insert([payload]),
+      logActivity({
+        user_name: user.name,
+        user_email,
+        activity_type: "evidence",
+        activity_name: "Evidence Created",
+        activity_message: `${user.name} created evidence "${evidence_title}"`,
+      }),
+      redis
+        .del(cacheKey)
+        .then(() => console.log(`Cache invalidated for key: ${cacheKey}`)),
+    ]);
+
+    if (insertResult.error) {
+      console.error("Supabase insert error:", insertResult.error);
       return NextResponse.json(
-        { error: error.message || "Insert gagal" },
+        { error: insertResult.error.message || "Insert gagal" },
         { status: 500 }
       );
     }
-
-    await logActivity({
-      user_name: user.name,
-      user_email,
-      activity_type: "evidence",
-      activity_name: "Evidence Created",
-      activity_message: `${user.name} created evidence "${evidence_title}"`,
-    });
-
-    // Invalidasi cache bulan sesuai evidence_date
-    const month = getMonthFromDate(evidence_date);
-    const cacheKey = `evidence:${user.email}:${month}`;
-    await redis.del(cacheKey);
-    console.log(`Cache invalidated for key: ${cacheKey}`);
 
     return NextResponse.json(
       { message: "Evidence created successfully", url: fileUrl },

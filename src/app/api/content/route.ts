@@ -28,33 +28,31 @@ export async function GET(req: Request) {
 
   const session = await getServerSession(authOptions);
   const user = session?.user;
-
   if (!user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { searchParams } = new URL(req.url);
-  const date = searchParams.get("date") || ""; // YYYY-MM-DD
-  const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100); // cap at 100
+  const date = searchParams.get("date") || "";
+  const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);
 
   const cacheKey = date ? `content:${date}` : "content:all";
   let redisHit = false;
 
-  // ===== Redis GET =====
-  let cached;
-  const redisStart = Date.now();
+  let data: any[] = [];
+
+  // Try Redis first
   try {
-    cached = await redis.get(cacheKey);
+    const cached = await redis.get(cacheKey);
     if (cached) {
       redisHit = true;
-      const redisTime = Date.now() - redisStart;
-      console.log(`Redis hit for ${cacheKey} in ${redisTime}ms`);
+      console.log(`Redis hit for ${cacheKey}`);
       return NextResponse.json({
         data: JSON.parse(cached),
         debug: {
           cacheKey,
           redisHit,
-          redisTime,
+          redisTime: 0,
           dbTime: 0,
           totalTime: Date.now() - totalStart,
           limit,
@@ -65,26 +63,14 @@ export async function GET(req: Request) {
   } catch (err) {
     console.error("Redis GET failed:", err);
   }
-  const redisTime = Date.now() - redisStart;
 
-  // ===== Supabase Query =====
-  let query = supabase
-    .from("content")
-    .select(
-      "id, content_title, content_caption, content_date, content_category, created_at, user_name"
-    );
-
-  if (date) {
-    query = query
-      .eq("content_date::date", date)
-      .order("created_at", { ascending: false })
-      .limit(limit);
-  } else {
-    query = query.order("created_at", { ascending: false }).limit(limit);
-  }
-
+  // Supabase query
   const dbStart = Date.now();
-  const { data, error } = await query;
+  const { data: dbData, error } = await supabase.rpc("get_content", {
+    filter_date: date || null,
+    row_limit: limit,
+  });
+
   const dbTime = Date.now() - dbStart;
 
   if (error) {
@@ -92,27 +78,29 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // ===== Redis SETEX =====
-  const ttl = date ? CACHE_TTL * 2 : CACHE_TTL;
-  try {
-    await redis.setex(cacheKey, ttl, JSON.stringify(data || []));
-  } catch (err) {
-    console.error("Redis SETEX failed:", err);
-  }
+  data = dbData || [];
+
+  // Fire-and-forget Redis SETEX
+  (async () => {
+    try {
+      const ttl = date ? CACHE_TTL * 2 : CACHE_TTL;
+      await redis.setex(cacheKey, ttl, JSON.stringify(data));
+    } catch (err) {
+      console.error("Redis SETEX failed:", err);
+    }
+  })();
 
   const totalTime = Date.now() - totalStart;
   console.log(
-    `DB query: ${dbTime}ms, Total GET: ${totalTime}ms, Rows: ${
-      data?.length || 0
-    }`
+    `DB query: ${dbTime}ms, Total GET: ${totalTime}ms, Rows: ${data.length}`
   );
 
   return NextResponse.json({
-    data: data || [],
+    data,
     debug: {
       cacheKey,
       redisHit,
-      redisTime,
+      redisTime: 0,
       dbTime,
       totalTime,
       limit,
@@ -139,9 +127,10 @@ export async function POST(req: NextRequest) {
     content_date,
   } = body;
 
-  const content_id = `${randomUUID()}`;
+  const content_id = randomUUID();
 
-  const { data: contentData, error: contentError } = await supabase
+  // run supabase inserts and logging in parallel
+  const contentInsert = supabase
     .from("content")
     .insert([
       {
@@ -158,11 +147,7 @@ export async function POST(req: NextRequest) {
     ])
     .select();
 
-  if (contentError) {
-    return NextResponse.json({ error: contentError.message }, { status: 500 });
-  }
-
-  await logActivity({
+  const logAct = logActivity({
     user_name: user.name,
     user_email: user.email,
     activity_type: "content",
@@ -170,7 +155,7 @@ export async function POST(req: NextRequest) {
     activity_message: `Created new content titled "${content_title}" scheduled for ${content_date}`,
   });
 
-  const { data: evidenceData, error: evidenceError } = await supabase
+  const evidenceInsert = supabase
     .from("evidence")
     .insert([
       {
@@ -185,40 +170,51 @@ export async function POST(req: NextRequest) {
     ])
     .select();
 
-  if (evidenceError) {
-    console.error(`Insert evidence failed: ${evidenceError.message}`);
+  const [contentRes, evidenceRes] = await Promise.all([
+    contentInsert,
+    evidenceInsert,
+    logAct,
+  ]);
+
+  if (contentRes.error) {
+    return NextResponse.json(
+      { error: contentRes.error.message },
+      { status: 500 }
+    );
+  }
+
+  if (evidenceRes.error) {
+    console.error(`Insert evidence failed: ${evidenceRes.error.message}`);
     return NextResponse.json(
       {
-        content: contentData,
-        evidenceError: evidenceError.message,
+        content: contentRes.data,
+        evidenceError: evidenceRes.error.message,
       },
       { status: 500 }
     );
   }
 
-  // invalidate redis cache
-  try {
-    // invalidate bulanan evidence
-    const month = new Date(content_date).toISOString().slice(5, 7);
-    await redis.del(`evidence:${user.email}:${month}`);
-    await redis.del(`content:${content_date}`);
-    await redis.del(`content:all`);
+  // invalidate redis asynchronously, don't block response
+  (async () => {
+    try {
+      const month = new Date(content_date).toISOString().slice(5, 7);
+      await redis.del(`evidence:${user.email}:${month}`);
+      await redis.del(`content:${content_date}`);
+      await redis.del(`content:all`);
 
-    // invalidate content per user (semua key yang match user.email)
-    const keys = getCacheKeyByMonth(content_date);
-    if (keys.length > 0) {
-      await redis.del(keys);
+      const keys = getCacheKeyByMonth(content_date);
+      if (keys.length > 0) await redis.del(keys);
+
+      console.log(`Redis invalidated for user ${user.email}`);
+    } catch (err) {
+      console.error("Redis invalidate failed:", err);
     }
-
-    console.log(`Redis invalidated for user ${user.email}`);
-  } catch (err) {
-    console.error("Redis invalidate failed:", err);
-  }
+  })();
 
   return NextResponse.json(
     {
-      content: contentData,
-      evidence: evidenceData,
+      content: contentRes.data,
+      evidence: evidenceRes.data,
     },
     { status: 201 }
   );

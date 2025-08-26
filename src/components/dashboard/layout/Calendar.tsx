@@ -33,7 +33,7 @@ const Calendar = ({ selectedDate, setSelectedDate }: CalendarProps) => {
     useEffect(() => {
         const fetchEvents = async () => {
             try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/content`);
+                const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}api/content`);
                 const response = await res.json(); // ini object { data: [...], debug: {...} }
 
                 const eventMap: Record<string, string> = {};
