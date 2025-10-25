@@ -87,7 +87,6 @@ export default function RootLayout({
         content_feedback: "",
         content_date: "",
       });
-      setCocOpen(false);
       new Toast({
         position: "top-right",
         toastMsg: "Berhasil menyimpan!",
@@ -99,6 +98,7 @@ export default function RootLayout({
         theme: "dark"
       });
       setUpdated(true);
+      setCocOpen(false);
     } else {
       setCocOpen(false);
       new Toast({

@@ -1,6 +1,5 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react'
-import { useGlobalStore } from '@/app/lib/global-store';
 
 type CalendarDay = {
     day: number
@@ -18,45 +17,51 @@ interface SelectedDate {
 interface CalendarProps {
     selectedDate: SelectedDate | null
     setSelectedDate: (date: SelectedDate) => void
+    // external trigger from parent; when this changes to a truthy value, refetch events
+    updated?: boolean | number
 }
 
 const weekdays = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
 
-const Calendar = ({ selectedDate, setSelectedDate }: CalendarProps) => {
+const Calendar = ({ selectedDate, setSelectedDate, updated }: CalendarProps) => {
     const today = new Date()
     const [currentDate, setCurrentDate] = useState(new Date())
     const [events, setEvents] = useState<Record<string, string>>({})
-    const updated = useGlobalStore((state) => state.updated);
-    const setUpdated = useGlobalStore((state) => state.setUpdated);
     const fetchEventsRef = useRef(false); // flag supaya cuma fetch 1x
 
-    useEffect(() => {
-        const fetchEvents = async () => {
-            try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/content`);
-                const response = await res.json(); // ini object { data: [...], debug: {...} }
+    const fetchEvents = async () => {
+        try {
+            // use relative path so client-side fetch works regardless NEXT_PUBLIC_BASE_URL
+            const res = await fetch('/api/content')
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            const response = await res.json()
 
-                const eventMap: Record<string, string> = {};
-                response.data.forEach((item: any) => {
-                    if (item.content_date && item.content_title) {
-                        eventMap[item.content_date] = item.content_title;
-                    }
-                });
+            const eventMap: Record<string, string> = {}
+            response.data.forEach((item: any) => {
+                if (item.content_date && item.content_title) {
+                    eventMap[item.content_date] = item.content_title
+                }
+            })
 
-
-                setEvents(eventMap);
-            } catch (error) {
-                console.error('Error fetching events:', error);
-            }
-        };
-
-        // Cuma fetch kalau belum pernah fetch
-        if (!fetchEventsRef.current || updated) {
-            fetchEvents();
-            fetchEventsRef.current = true; // set flag
-            setUpdated(false); // reset updated
+            setEvents(eventMap)
+        } catch (error) {
+            console.error('Error fetching events:', error)
         }
-    }, [updated, setUpdated]);
+    }
+
+    // initial fetch on mount
+    useEffect(() => {
+        if (!fetchEventsRef.current) {
+            fetchEvents()
+            fetchEventsRef.current = true
+        }
+    }, [])
+
+    // fetch again when parent `updated` prop changes to a truthy value
+    useEffect(() => {
+        if (!updated) return
+        fetchEvents()
+    }, [updated])
 
 
     const getDaysInMonth = (year: number, month: number) =>

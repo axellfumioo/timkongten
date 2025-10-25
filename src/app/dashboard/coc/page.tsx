@@ -73,7 +73,7 @@ const App = () => {
   useEffect(() => {
     if (updated) {
       fetchEvents()
-      // setUpdated(false)
+      setUpdated(false)
     }
   }, [updated, dateFormatted])
 
@@ -103,7 +103,7 @@ const App = () => {
             <section className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8 mb-12">
               {/* Kiri: Kalender */}
               <div className="space-y-8">
-                <Calendar selectedDate={selectedDate} setSelectedDate={setSelectedDate} />
+                <Calendar selectedDate={selectedDate} setSelectedDate={setSelectedDate} updated={updated} />
               </div>
 
               {/* Kanan: Motivasi & Daftar Konten */}
