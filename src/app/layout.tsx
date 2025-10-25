@@ -119,7 +119,7 @@ export default function RootLayout({
   return (
     <html lang="en" >
       <head>
-        <title>Tim Konten Dashboard</title>
+        <title>Tim Konten/BA Dashboard</title>
         <meta name="color-scheme" content="dark"></meta>
         <link rel="icon" href="/faviconlogo.ico" sizes="any" />
         <meta name="description" content="Dashboard untuk tim konten SMK Telkom Purwokerto" />

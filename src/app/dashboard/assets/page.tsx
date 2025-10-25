@@ -13,6 +13,7 @@ function App() {
     var notes = [
         { title: "Logo SMK Putih", description: "Logo SMK Telkom Putih", url: "/logosmk.png", urlDownload: "/logosmkputih.png" },
         { title: "Logo SMK Hitam", description: "Logo SMK Telkom Hitam", url: "/logo.png", urlDownload: "/logosmkhitam.png" },
+        { title: "Brand Ambassador", description: "Folder Google Drive berisi assets", url: "/ba_devan.jpg", urlDownload: "https://drive.google.com/drive/folders/1BKxO92UghGOE7SoSHTEDW4FzDlPxlWkD?usp=sharing" },
     ]
     return (
         <AuthGuard>

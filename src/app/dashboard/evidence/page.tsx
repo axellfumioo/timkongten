@@ -69,22 +69,6 @@ function EvidenceDashboard() {
     });
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-    const fetchContents = async () => {
-        try {
-            setLoadingContents(true);
-            const res = await fetch('/api/content');
-            if (!res.ok) throw new Error('Gagal fetch konten');
-
-            const data = await res.json();
-            setContents(data.data || []); // Pastikan sesuai format API lu
-        } catch (err) {
-            console.error('Error ambil konten:', err);
-            setContents([]);
-        } finally {
-            setLoadingContents(false);
-        }
-    };
-
 
     // ambil data dari API
     const fetchEvidences = async () => {
@@ -155,11 +139,9 @@ function EvidenceDashboard() {
     // jalankan saat pertama load & updated = true
     useEffect(() => {
         fetchEvidences();
-        fetchContents();
         setUpdated(false);
         if (updated) {
             fetchEvidences();
-            fetchContents();
             setUpdated(false);
         }
     }, [status, selectedMonth, searchTerm, updated]);
