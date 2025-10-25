@@ -5,7 +5,7 @@ import { logActivity } from "@/app/lib/logActivity";
 import redis from "@/app/lib/redis";
 import { authOptions } from "@/app/lib/authOptions";
 import { randomUUID } from "crypto";
-import { uploadToR2 } from "@/app/lib/uploadToR2";
+import { uploadToB2 } from "@/app/lib/uploadToB2";
 
 const CACHE_PREFIX = "evidence:";
 const CACHE_EXPIRE_SECONDS = 1800;
@@ -101,7 +101,7 @@ export async function PUT(
   if (completion_proof && completion_proof.name) {
     const fileExt = completion_proof.name.split(".").pop();
     const filename = `${randomUUID()}.${fileExt}`;
-    fileUrl = await uploadToR2(
+    fileUrl = await uploadToB2(
       completion_proof,
       filename,
       process.env.R2_BUCKET!

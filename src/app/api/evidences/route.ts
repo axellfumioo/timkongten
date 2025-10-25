@@ -1,6 +1,6 @@
 import { supabase } from "@/app/lib/supabase";
 import { NextResponse } from "next/server";
-import { uploadToR2 } from "@/app/lib/uploadToR2";
+import { uploadToB2 } from "@/app/lib/uploadToB2";
 import { randomUUID } from "crypto";
 import { getServerSession } from "next-auth";
 import { logActivity } from "@/app/lib/logActivity";
@@ -153,7 +153,7 @@ export async function POST(req: Request) {
       const fileExt = file.name.split(".").pop();
       const filename = `${randomUUID()}.${fileExt}`;
       const uploadStart = Date.now();
-      fileUrl = await uploadToR2(file, filename, process.env.R2_BUCKET!);
+      fileUrl = await uploadToB2(file, filename, process.env.B2_BUCKET!);
       uploadTime = Date.now() - uploadStart;
     }
 
@@ -202,7 +202,7 @@ export async function POST(req: Request) {
     }
 
     const profiling = {
-      upload_r2: `${uploadTime}ms`,
+      upload_b2: `${uploadTime}ms`,
       insert_supabase: `${insertTime}ms`,
       total: `${Date.now() - totalStart}ms`,
     };
