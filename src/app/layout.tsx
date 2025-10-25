@@ -8,6 +8,7 @@ import Toast from "typescript-toastify";
 import { useGlobalStore } from "./lib/global-store";
 import ContentModal from "@/components/dashboard/layout/contentModal";
 import { Save, Loader2 } from "lucide-react";
+import { Analytics } from "@vercel/analytics/next"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -127,7 +128,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-
+        <Analytics/>
         <ContentModal isOpen={isCocOpen} onClose={() => setCocOpen(false)}>
           <h2 className="text-2xl font-semibold mb-6">Tambah Konten Baru</h2>
 
