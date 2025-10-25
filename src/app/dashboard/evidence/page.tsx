@@ -136,6 +136,30 @@ function EvidenceDashboard() {
         }
     };
 
+    // fetch contents dari API
+    const fetchContents = async () => {
+        try {
+            setLoadingContents(true);
+            const user_email = session?.user?.email;
+            if (!user_email) {
+                setLoadingContents(false);
+                setContents([]);
+                return;
+            }
+
+            const res = await fetch(`/api/content?user=${user_email}`);
+            if (!res.ok) throw new Error('Gagal fetch content');
+            const data = await res.json();
+
+            setContents(data.data || []);
+        } catch (err) {
+            console.error(err);
+            setContents([]);
+        } finally {
+            setLoadingContents(false);
+        }
+    };
+
     // jalankan saat pertama load & updated = true
     useEffect(() => {
         fetchEvidences();
@@ -145,6 +169,13 @@ function EvidenceDashboard() {
             setUpdated(false);
         }
     }, [status, selectedMonth, searchTerm, updated]);
+
+    // fetch contents saat modal dibuka
+    useEffect(() => {
+        if (modalOpen) {
+            fetchContents();
+        }
+    }, [modalOpen]);
 
     // helper: bikin grouping + sorting
     const groupedContents = contents.reduce((acc: Record<string, any[]>, item: any) => {
@@ -214,6 +245,112 @@ function EvidenceDashboard() {
         }
     };
 
+    // Fungsi kompresi gambar dengan target maksimal 300KB
+    const compressImage = async (file: File): Promise<File> => {
+        const MAX_FILE_SIZE = 300 * 1024; // 300KB dalam bytes
+
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = async () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    if (!ctx) {
+                        reject(new Error('Gagal membuat canvas context'));
+                        return;
+                    }
+
+                    // Mulai dengan dimensi yang lebih kecil untuk hasil yang lebih baik
+                    let MAX_WIDTH = 1280;
+                    let MAX_HEIGHT = 1280;
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Hitung ukuran baru dengan mempertahankan aspect ratio
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height = (height * MAX_WIDTH) / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width = (width * MAX_HEIGHT) / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    // Gambar ulang image ke canvas dengan ukuran baru
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Fungsi untuk mengkompresi dengan quality tertentu
+                    const compressWithQuality = (quality: number): Promise<Blob | null> => {
+                        return new Promise((res) => {
+                            canvas.toBlob(
+                                (blob) => res(blob),
+                                'image/jpeg',
+                                quality
+                            );
+                        });
+                    };
+
+                    // Iterasi untuk mencari quality optimal agar ukuran <= 300KB
+                    let quality = 0.85;
+                    let blob: Blob | null = null;
+                    let attempts = 0;
+                    const maxAttempts = 10;
+
+                    while (attempts < maxAttempts) {
+                        blob = await compressWithQuality(quality);
+                        
+                        if (!blob) {
+                            break;
+                        }
+
+                        // Jika ukuran sudah di bawah target, selesai
+                        if (blob.size <= MAX_FILE_SIZE) {
+                            break;
+                        }
+
+                        // Kurangi quality untuk iterasi berikutnya
+                        quality -= 0.1;
+                        attempts++;
+
+                        // Jika quality sudah terlalu rendah, resize canvas lebih kecil
+                        if (quality < 0.4 && blob.size > MAX_FILE_SIZE) {
+                            width = Math.floor(width * 0.8);
+                            height = Math.floor(height * 0.8);
+                            canvas.width = width;
+                            canvas.height = height;
+                            ctx.drawImage(img, 0, 0, width, height);
+                            quality = 0.7; // Reset quality setelah resize
+                        }
+                    }
+
+                    if (blob) {
+                        // Buat file baru dari blob dengan nama yang sama
+                        const compressedFile = new File([blob], file.name, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now(),
+                        });
+                        console.log(`Kompresi selesai: ${(blob.size / 1024).toFixed(2)} KB (quality: ${quality.toFixed(2)})`);
+                        resolve(compressedFile);
+                    } else {
+                        reject(new Error('Gagal kompresi gambar'));
+                    }
+                };
+                img.onerror = () => reject(new Error('Gagal memuat gambar'));
+            };
+            reader.onerror = () => reject(new Error('Gagal membaca file'));
+        });
+    };
+
     // submit evidence
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -237,13 +374,26 @@ function EvidenceDashboard() {
                 return;
             }
 
+            // Kompresi gambar jika file adalah gambar
+            let fileToUpload = selectedFile;
+            if (selectedFile.type.startsWith('image/')) {
+                try {
+                    console.log('Ukuran asli:', (selectedFile.size / 1024).toFixed(2), 'KB');
+                    fileToUpload = await compressImage(selectedFile);
+                    console.log('Ukuran setelah kompresi:', (fileToUpload.size / 1024).toFixed(2), 'KB');
+                } catch (error) {
+                    console.error('Gagal kompresi, menggunakan file asli:', error);
+                    // Tetap lanjut dengan file asli jika kompresi gagal
+                }
+            }
+
             const formPayload = new FormData();
             formPayload.append('evidence_title', formData.evidence_title);
             formPayload.append('evidence_description', formData.evidence_description);
             formPayload.append('evidence_date', formData.evidence_date);
             formPayload.append('evidence_job', formData.evidence_job);
             formPayload.append('content_id', formData.content_id);
-            formPayload.append('completion_proof', selectedFile);
+            formPayload.append('completion_proof', fileToUpload);
 
             const response = await fetch('/api/evidences', { method: 'POST', body: formPayload });
 
