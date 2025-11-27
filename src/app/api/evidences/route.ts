@@ -4,17 +4,7 @@ import { uploadToB2 } from "@/app/lib/uploadToB2";
 import { randomUUID } from "crypto";
 import { getServerSession } from "next-auth";
 import { logActivity } from "@/app/lib/logActivity";
-import redis from "@/app/lib/redis";
 import { authOptions } from "@/app/lib/authOptions";
-
-const CACHE_EXPIRE_SECONDS = 1800;
-
-// Helper ambil bulan format MM
-function getMonthFromDate(dateStr: string): string {
-  if (!dateStr) return "all";
-  const parts = dateStr.split("-");
-  return parts[1]?.padStart(2, "0") || "all";
-}
 
 export async function GET(req: Request) {
   const totalStart = Date.now();
@@ -33,43 +23,7 @@ export async function GET(req: Request) {
   const currentMonth = String(new Date().getMonth() + 1).padStart(2, "0");
   const evidenceMonth = monthParam ? monthParam.padStart(2, "0") : currentMonth;
 
-  const cacheKey = `evidence:${user}:${evidenceMonth}`;
-
-  // ===== Redis GET Profiling =====
-  const redisGetStart = Date.now();
-  const cachedData = await redis.get(cacheKey);
-  const redisGetTime = Date.now() - redisGetStart;
-
-  if (cachedData) {
-    const cachedJson: any[] = JSON.parse(cachedData);
-    const acceptedEvidences = cachedJson.filter(
-      (item) => item.evidence_status === "accepted"
-    ).length;
-
-    const profiling = {
-      redis_get: `${redisGetTime}ms`,
-      supabase: "0ms",
-      redis_set: "0ms",
-      total: `${Date.now() - totalStart}ms`,
-    };
-
-    console.log("[GET /evidences] Cache HIT", profiling);
-
-    return NextResponse.json(
-      { data: cachedJson, acceptedEvidences, profiling },
-      {
-        status: 200,
-        headers: {
-          "X-Redis-Get": `${redisGetTime}ms`,
-          "X-Supabase-Query": "0ms",
-          "X-Redis-Set": "0ms",
-          "X-Total-Time": `${Date.now() - totalStart}ms`,
-        },
-      }
-    );
-  }
-
-  // ===== Supabase Query Profiling =====
+  // ===== Supabase Query =====
   const monthStart = `${new Date().getFullYear()}-${evidenceMonth}-01`;
   const monthEndDate = new Date(
     new Date(monthStart).getFullYear(),
@@ -78,14 +32,12 @@ export async function GET(req: Request) {
   ).getDate();
   const monthEnd = `${new Date().getFullYear()}-${evidenceMonth}-${monthEndDate}`;
 
-  
-
   const dbStart = Date.now();
   const { data, error } = await supabase.rpc("get_evidences", {
-  target_email: user ?? null,
-  start_date: monthStart,
-  end_date: monthEnd,
-});
+    target_email: user ?? null,
+    start_date: monthStart,
+    end_date: monthEnd,
+  });
 
   const dbTime = Date.now() - dbStart;
 
@@ -98,28 +50,19 @@ export async function GET(req: Request) {
     (item: any) => item.evidence_status === "accepted"
   ).length;
 
-  // ===== Redis SET Profiling =====
-  const redisSetStart = Date.now();
-  await redis.setex(cacheKey, CACHE_EXPIRE_SECONDS, JSON.stringify(data));
-  const redisSetTime = Date.now() - redisSetStart;
-
   const profiling = {
-    redis_get: `${redisGetTime}ms`,
     supabase: `${dbTime}ms`,
-    redis_set: `${redisSetTime}ms`,
     total: `${Date.now() - totalStart}ms`,
   };
 
-  console.log("[GET /evidences] Cache MISS", profiling);
+  console.log("[GET /evidences]", profiling);
 
   return NextResponse.json(
     { data, acceptedEvidences, profiling },
     {
       status: 200,
       headers: {
-        "X-Redis-Get": `${redisGetTime}ms`,
         "X-Supabase-Query": `${dbTime}ms`,
-        "X-Redis-Set": `${redisSetTime}ms`,
         "X-Total-Time": `${Date.now() - totalStart}ms`,
       },
     }
@@ -146,7 +89,7 @@ export async function POST(req: Request) {
     const content_id = formData.get("content_id") as string | null;
     const file = formData.get("completion_proof") as File | null;
 
-    // ===== Upload File Profiling =====
+    // ===== Upload File =====
     let fileUrl: string | null = null;
     let uploadTime = 0;
     if (file && file.name) {
@@ -175,10 +118,7 @@ export async function POST(req: Request) {
       evidence_status: "pending",
     };
 
-    // ===== Supabase Insert + Cache Invalidate Profiling =====
-    const month = getMonthFromDate(evidence_date);
-    const cacheKey = `evidence:${user.email}:${month}`;
-
+    // ===== Supabase Insert =====
     const insertStart = Date.now();
     const [insertResult] = await Promise.all([
       supabase.from("evidence").insert([payload]),
@@ -189,7 +129,6 @@ export async function POST(req: Request) {
         activity_name: "Evidence Created",
         activity_message: `${user.name} created evidence "${evidence_title}"`,
       }),
-      redis.del(cacheKey),
     ]);
     const insertTime = Date.now() - insertStart;
 

@@ -2,23 +2,7 @@ import { supabase } from "@/app/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { logActivity } from "@/app/lib/logActivity";
-import redis from "@/app/lib/redis";
 import { authOptions } from "@/app/lib/authOptions";
-
-const CACHE_PREFIX = "content:";
-const CACHE_EXPIRE_SECONDS = 1800; // 10 menit
-
-function getCacheKeyByMonth(dateStr: string) {
-  if (!dateStr) throw new Error("Date is required for cache key");
-  const parts = dateStr.split("-");
-  if (parts.length < 2) throw new Error("Invalid date format");
-  const month = parts[1].padStart(2, "0");
-  if (!/^\d{2}$/.test(month)) throw new Error("Invalid month format");
-  if (parseInt(month) < 1 || parseInt(month) > 12) {
-    throw new Error("Month out of range");
-  }
-  return `${CACHE_PREFIX}${month}`;
-}
 
 /**
  * GET content by ID
@@ -35,36 +19,7 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Ambil content_date dari DB
-  const { data: contentData, error: fetchError } = await supabase
-    .from("content")
-    .select("content_date")
-    .eq("id", id)
-    .single();
-
-  if (fetchError || !contentData) {
-    return NextResponse.json({ error: "Content not found" }, { status: 404 });
-  }
-
-  let cacheKey: string;
-  try {
-    cacheKey = `content:${contentData.content_date}`;
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid content_date format" },
-      { status: 400 }
-    );
-  }
-
-  // Cek cache
-  const cached = await redis.get(cacheKey);
-  if (cached) {
-    const cachedData = JSON.parse(cached);
-    const item = cachedData.find((c: any) => c.id === id);
-    if (item) return NextResponse.json(item);
-  }
-
-  // Query langsung kalo gak ada di cache
+  // Query langsung dari Supabase
   const { data, error } = await supabase
     .from("content")
     .select("*")
@@ -74,19 +29,6 @@ export async function GET(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 404 });
   }
-
-  // Update cache bulan
-  let monthCache: any[] = cached ? JSON.parse(cached) : [];
-  const idx = monthCache.findIndex((c) => c.id === id);
-  if (idx !== -1) monthCache[idx] = data;
-  else monthCache.push(data);
-
-  await redis.set(
-    cacheKey,
-    JSON.stringify(monthCache),
-    "EX",
-    CACHE_EXPIRE_SECONDS
-  );
 
   return NextResponse.json(data);
 }
@@ -120,16 +62,6 @@ export async function DELETE(
     );
   }
 
-  let cacheKey: string;
-  try {
-    cacheKey = getCacheKeyByMonth(contentData.content_date);
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid content_date format" },
-      { status: 400 }
-    );
-  }
-
   // Delete content
   const { error: deleteError } = await supabase
     .from("content")
@@ -148,19 +80,6 @@ export async function DELETE(
     activity_name: "Content Removed",
     activity_message: `Removed content titled "${contentData.content_title}" scheduled for ${contentData.content_date}`,
   }).catch(() => {});
-
-  const date = new Date(contentData.content_date);
-  const month = String(date.getMonth() + 1).padStart(2, "0"); // "08"
-
-  // Invalidasi cache bulan
-  try {
-    await redis.del(`content:${contentData.content_date}`);
-    await redis.del(`content:all`);
-    await redis.del(`evidence:${user.email}:${month}`);
-    console.log("Deleted cache key:", `evidence:${month}`);
-  } catch (cacheError) {
-    console.error("Cache invalidation error:", cacheError);
-  }
 
   return NextResponse.json({ message: "Deleted successfully" });
 }
@@ -197,16 +116,6 @@ export async function PUT(
     );
   }
 
-  let cacheKey: string;
-  try {
-    cacheKey = getCacheKeyByMonth(content_date);
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid content_date format" },
-      { status: 400 }
-    );
-  }
-
   try {
     const { data, error } = await supabase
       .from("content")
@@ -232,13 +141,6 @@ export async function PUT(
       activity_name: "Content Updated",
       activity_message: `Updated content titled "${content_title}"`,
     });
-
-    // Invalidasi cache bulan updated content
-    try {
-      await redis.del(`content:${content_date}`);
-    } catch (cacheError) {
-      console.error("Cache invalidation error:", cacheError);
-    }
 
     return NextResponse.json(data);
   } catch (err) {

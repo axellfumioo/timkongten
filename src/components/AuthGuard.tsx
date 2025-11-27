@@ -13,7 +13,6 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const { data: session, status } = useSession()
   const router = useRouter()
 
-  // 🚀 Redirect lebih cepat, tanpa re-render aneh
   useEffect(() => {
     if (status === "unauthenticated") {
       router.replace("/")

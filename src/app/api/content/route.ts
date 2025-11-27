@@ -2,25 +2,9 @@ import { supabase } from "@/app/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { logActivity } from "@/app/lib/logActivity";
-import redis from "@/app/lib/redis";
 import { authOptions } from "@/app/lib/authOptions";
 
 import { randomUUID } from "crypto";
-
-const CACHE_TTL = 60 * 30; // 5 menit biar gak basi tapi juga gak stale terlalu lama
-const CACHE_PREFIX = "content:";
-
-function getCacheKeyByMonth(dateStr: string) {
-  if (!dateStr) throw new Error("Date is required for cache key");
-  const parts = dateStr.split("-");
-  if (parts.length < 2) throw new Error("Invalid date format");
-  const month = parts[1].padStart(2, "0");
-  if (!/^\d{2}$/.test(month)) throw new Error("Invalid month format");
-  if (parseInt(month) < 1 || parseInt(month) > 12) {
-    throw new Error("Month out of range");
-  }
-  return `${CACHE_PREFIX}${month}`;
-}
 
 // GET: Ambil semua content
 export async function GET(req: Request) {
@@ -36,34 +20,6 @@ export async function GET(req: Request) {
   const date = searchParams.get("date") || "";
   const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);
 
-  const cacheKey = date ? `content:${date}` : "content:all";
-  let redisHit = false;
-
-  let data: any[] = [];
-
-  // Try Redis first
-  try {
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      redisHit = true;
-      console.log(`Redis hit for ${cacheKey}`);
-      return NextResponse.json({
-        data: JSON.parse(cached),
-        debug: {
-          cacheKey,
-          redisHit,
-          redisTime: 0,
-          dbTime: 0,
-          totalTime: Date.now() - totalStart,
-          limit,
-          dateFilter: date || "none",
-        },
-      });
-    }
-  } catch (err) {
-    console.error("Redis GET failed:", err);
-  }
-
   // Supabase query
   const dbStart = Date.now();
   const { data: dbData, error } = await supabase.rpc("get_content", {
@@ -78,18 +34,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  data = dbData || [];
-
-  // Fire-and-forget Redis SETEX
-  (async () => {
-    try {
-      const ttl = date ? CACHE_TTL * 2 : CACHE_TTL;
-      await redis.setex(cacheKey, ttl, JSON.stringify(data));
-    } catch (err) {
-      console.error("Redis SETEX failed:", err);
-    }
-  })();
-
+  const data = dbData || [];
   const totalTime = Date.now() - totalStart;
   console.log(
     `DB query: ${dbTime}ms, Total GET: ${totalTime}ms, Rows: ${data.length}`
@@ -98,9 +43,6 @@ export async function GET(req: Request) {
   return NextResponse.json({
     data,
     debug: {
-      cacheKey,
-      redisHit,
-      redisTime: 0,
       dbTime,
       totalTime,
       limit,
@@ -175,32 +117,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Logging dan Redis bisa jalan async, nggak blocking
-  (async () => {
-    try {
-      // Logging activity
-      await logActivity({
-        user_name: user.name,
-        user_email: user.email,
-        activity_type: "content",
-        activity_name: "Content Create",
-        activity_message: `Created new content titled "${content_title}" scheduled for ${content_date}`,
-      });
-
-      // Redis invalidation
-      const month = new Date(content_date).toISOString().slice(5, 7);
-      await redis.del(`evidence:${user.email}:${month}`);
-      await redis.del(`content:${content_date}`);
-      await redis.del(`content:all`);
-
-      const keys = getCacheKeyByMonth(content_date);
-      if (keys.length > 0) await redis.del(keys);
-
-      console.log(`Redis invalidated for user ${user.email}`);
-    } catch (err) {
-      console.error("Async tasks failed:", err);
-    }
-  })();
+  // Logging async
+  logActivity({
+    user_name: user.name,
+    user_email: user.email,
+    activity_type: "content",
+    activity_name: "Content Create",
+    activity_message: `Created new content titled "${content_title}" scheduled for ${content_date}`,
+  }).catch((err) => {
+    console.error("Async logging failed:", err);
+  });
 
   return NextResponse.json(
     {

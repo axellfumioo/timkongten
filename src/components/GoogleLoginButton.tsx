@@ -7,6 +7,27 @@ import { useState, useEffect } from "react";
 export default function GoogleLoginButton() {
   const [loading, setLoading] = useState(false);
   const [online, setOnline] = useState(true)
+  const [checking, setChecking] = useState(true)
+  
+  useEffect(() => {
+    const checkHealth = async () => {
+      setChecking(true)
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/health`, {
+          method: 'GET',
+          cache: 'no-cache'
+        })
+        setOnline(response.ok)
+      } catch (error) {
+        console.error('Health check failed:', error)
+        setOnline(false)
+      } finally {
+        setChecking(false)
+      }
+    }
+    
+    checkHealth()
+  }, [])
   
   const handleGoogleSignIn = () => {
     if (online) {
@@ -25,18 +46,18 @@ export default function GoogleLoginButton() {
           whileTap={{ scale: 0.96 }}
           whileHover={{ scale: 1.015 }}
           transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-          className={`flex items-center justify-center gap-3 px-5 py-3 w-full border rounded-xl shadow-md hover:shadow-lg active:shadow-sm transition-shadow duration-200 ${loading ? "bg-zinc-800 border-zinc-700 cursor-default" : "bg-zinc-900 border-zinc-700 cursor-pointer"} text-zinc-100`}
+          className={`flex items-center justify-center gap-3 px-5 py-3 w-full border rounded-xl shadow-md hover:shadow-lg active:shadow-sm transition-shadow duration-200 ${loading || checking ? "bg-zinc-800 border-zinc-700 cursor-default" : "bg-zinc-900 border-zinc-700 cursor-pointer"} text-zinc-100`}
           onClick={handleGoogleSignIn}
-          disabled={loading ? true : false}
+          disabled={loading || checking}
         >
-          {loading ? "" : <img
+          {loading || checking ? "" : <img
             src="/google.svg"
             alt="Google"
             className="w-5 h-5"
           />}
 
           <span className="text-sm font-medium">
-            {loading ? "Loading..." : "Masuk menggunakan Google"}
+            {checking ? "Checking..." : loading ? "Loading..." : "Masuk menggunakan Google"}
           </span>
         </motion.button>
         :

@@ -2,13 +2,9 @@ import { supabase } from "@/app/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { logActivity } from "@/app/lib/logActivity";
-import redis from "@/app/lib/redis";
 import { authOptions } from "@/app/lib/authOptions";
 import { randomUUID } from "crypto";
 import { uploadToB2 } from "@/app/lib/uploadToB2";
-
-const CACHE_PREFIX = "evidence:";
-const CACHE_EXPIRE_SECONDS = 1800;
 
 // Helper ambil bulan format MM dari tanggal yyyy-mm-dd
 function getMonthFromDate(dateString: string) {
@@ -39,19 +35,6 @@ export async function GET(
 
   if (error || !data)
     return NextResponse.json({ error: "Evidence not found" }, { status: 404 });
-
-  const month = getMonthFromDate(data.evidence_date);
-  const cacheKey = `${CACHE_PREFIX}${user.email}:${month}`;
-
-
-  const cached = await redis.get(cacheKey);
-  if (cached) {
-    const cachedData = JSON.parse(cached);
-    const found = Array.isArray(cachedData)
-      ? cachedData.find((item: any) => item.id === id)
-      : null;
-    if (found) return NextResponse.json(found);
-  }
 
   // Log activity async
   logActivity({
@@ -95,7 +78,6 @@ export async function PUT(
       { status: 404 }
     );
 
-  const month = getMonthFromDate(oldData.evidence_date);
   let fileUrl = oldData.completion_proof || null;
 
   if (completion_proof && completion_proof.name) {
@@ -129,8 +111,6 @@ export async function PUT(
     activity_message: `${user.name} updated evidence "${evidence_title}"`,
   });
 
-  await redis.del(`${CACHE_PREFIX}${user.email}:${month}`);
-
   return NextResponse.json({ message: "Evidence updated successfully" });
 }
 
@@ -154,8 +134,6 @@ export async function DELETE(
     .eq("id", id)
     .single();
 
-  const month = getMonthFromDate(evidenceData?.evidence_date);
-
   const { error } = await supabase.from("evidence").delete().eq("id", id);
 
   if (error)
@@ -170,9 +148,6 @@ export async function DELETE(
       evidenceData?.evidence_title || id
     }"`,
   });
-
-  await redis.del(`${CACHE_PREFIX}${evidenceData?.user_email}:${month}`);
-  // console.log(`OAKWOAKWOWAKOAWKWAOKWAOKAWOKAWOKWAOKWAOWAK | ${CACHE_PREFIX}:${evidenceData?.user_email}:${month}`)
 
   return NextResponse.json({ message: "Evidence deleted successfully" });
 }
@@ -207,8 +182,6 @@ export async function PATCH(
       { status: 404 }
     );
 
-  const month = getMonthFromDate(evidenceData.evidence_date);
-
   const { error } = await supabase
     .from("evidence")
     .update({ evidence_status: status })
@@ -216,8 +189,6 @@ export async function PATCH(
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
-
-  await redis.del(`${CACHE_PREFIX}${evidenceData.user_email}:${month}`);
 
   await logActivity({
     user_name: user.name,
