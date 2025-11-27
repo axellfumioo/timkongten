@@ -107,7 +107,7 @@ function App() {
 
             <section className="mb-12">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-6 gbg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl transition-all">
+                <div className="p-6 bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl transition-all">
                   <CheckCircle className="text-green-400 mb-2" />
                   <p className="text-3xl font-bold">{loading ? "..." : stats.content}</p>
                   <p className="text-sm text-gray-400">Total Evidence (semua siswa)</p>

@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 import { getServerSession } from "next-auth";
 import { logActivity } from "@/app/lib/logActivity";
 import { authOptions } from "@/app/lib/authOptions";
+import { cacheHelper } from "@/lib/redis";
 
 export async function GET(req: Request) {
   const totalStart = Date.now();
@@ -32,41 +33,56 @@ export async function GET(req: Request) {
   ).getDate();
   const monthEnd = `${new Date().getFullYear()}-${evidenceMonth}-${monthEndDate}`;
 
-  const dbStart = Date.now();
-  const { data, error } = await supabase.rpc("get_evidences", {
-    target_email: user ?? null,
-    start_date: monthStart,
-    end_date: monthEnd,
-  });
+  // Cache key berdasarkan user dan month
+  const cacheKey = `evidence:${user || 'all'}:${evidenceMonth}`;
 
-  const dbTime = Date.now() - dbStart;
+  try {
+    const dbStart = Date.now();
+    const data = await cacheHelper.getOrSet(
+      cacheKey,
+      async () => {
+        const { data, error } = await supabase.rpc("get_evidences", {
+          target_email: user ?? null,
+          start_date: monthStart,
+          end_date: monthEnd,
+        });
 
-  if (error) {
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        return data || [];
+      },
+      300 // Cache 5 menit
+    );
+
+    const dbTime = Date.now() - dbStart;
+
+    const acceptedEvidences = data.filter(
+      (item: any) => item.evidence_status === "accepted"
+    ).length;
+
+    const profiling = {
+      supabase: `${dbTime}ms`,
+      total: `${Date.now() - totalStart}ms`,
+    };
+
+    console.log("[GET /evidences]", profiling);
+
+    return NextResponse.json(
+      { data, acceptedEvidences, profiling },
+      {
+        status: 200,
+        headers: {
+          "X-Supabase-Query": `${dbTime}ms`,
+          "X-Total-Time": `${Date.now() - totalStart}ms`,
+        },
+      }
+    );
+  } catch (error: any) {
     console.error("GET /evidences error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
-  const acceptedEvidences = (data || []).filter(
-    (item: any) => item.evidence_status === "accepted"
-  ).length;
-
-  const profiling = {
-    supabase: `${dbTime}ms`,
-    total: `${Date.now() - totalStart}ms`,
-  };
-
-  console.log("[GET /evidences]", profiling);
-
-  return NextResponse.json(
-    { data, acceptedEvidences, profiling },
-    {
-      status: 200,
-      headers: {
-        "X-Supabase-Query": `${dbTime}ms`,
-        "X-Total-Time": `${Date.now() - totalStart}ms`,
-      },
-    }
-  );
 }
 
 export async function POST(req: Request) {
@@ -147,6 +163,10 @@ export async function POST(req: Request) {
     };
 
     console.log("[POST /evidences]", profiling);
+
+    // Invalidate cache setelah insert
+    await cacheHelper.invalidatePattern('evidence:*');
+    await cacheHelper.invalidate('stats');
 
     return NextResponse.json(
       { message: "Evidence created successfully", url: fileUrl, profiling },

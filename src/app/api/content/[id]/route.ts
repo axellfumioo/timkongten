@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { logActivity } from "@/app/lib/logActivity";
 import { authOptions } from "@/app/lib/authOptions";
+import { cacheHelper } from "@/lib/redis";
 
 /**
  * GET content by ID
@@ -72,6 +73,11 @@ export async function DELETE(
     return NextResponse.json({ error: deleteError.message }, { status: 500 });
   }
 
+  // Invalidate cache
+  await cacheHelper.invalidatePattern('content:*');
+  await cacheHelper.invalidatePattern('evidence:*');
+  await cacheHelper.invalidate('stats');
+
   // Log aktivitas async
   logActivity({
     user_name: user.name,
@@ -133,6 +139,10 @@ export async function PUT(
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // Invalidate cache
+    await cacheHelper.invalidatePattern('content:*');
+    await cacheHelper.invalidate('stats');
 
     await logActivity({
       user_name: user.name,

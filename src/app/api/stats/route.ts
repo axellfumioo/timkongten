@@ -1,24 +1,30 @@
 import { supabase } from "@/app/lib/supabase";
 import { NextRequest, NextResponse } from "next/server";
+import { cacheHelper } from "@/lib/redis";
 
 export async function GET(req: NextRequest) {
   try {
-    // ambil data dari Supabase RPC
-    const { data, error } = await supabase.rpc("get_statistics");
+    // Gunakan cache untuk statistics (cache lebih lama karena jarang berubah)
+    const stats = await cacheHelper.getOrSet(
+      'stats',
+      async () => {
+        const { data, error } = await supabase.rpc("get_statistics");
 
-    if (error) {
-      console.error("Error fetching stats via RPC:", error.message);
-      return NextResponse.json(
-        { success: false, error: "Gagal mengambil statistik" },
-        { status: 500 }
-      );
-    }
+        if (error) {
+          console.error("Error fetching stats via RPC:", error.message);
+          throw new Error("Gagal mengambil statistik");
+        }
+
+        return data;
+      },
+      600 // Cache 10 menit
+    );
 
     return NextResponse.json(
       {
         success: true,
         message: "Statistik berhasil diambil",
-        stats: data,
+        stats,
       },
       { status: 200 }
     );

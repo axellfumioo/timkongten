@@ -5,6 +5,7 @@ import { logActivity } from "@/app/lib/logActivity";
 import { authOptions } from "@/app/lib/authOptions";
 import { randomUUID } from "crypto";
 import { uploadToB2 } from "@/app/lib/uploadToB2";
+import { cacheHelper } from "@/lib/redis";
 
 // Helper ambil bulan format MM dari tanggal yyyy-mm-dd
 function getMonthFromDate(dateString: string) {
@@ -103,6 +104,10 @@ export async function PUT(
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // Invalidate cache
+  await cacheHelper.invalidatePattern('evidence:*');
+  await cacheHelper.invalidate('stats');
+
   await logActivity({
     user_name: user.name,
     user_email: user.email,
@@ -138,6 +143,10 @@ export async function DELETE(
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Invalidate cache
+  await cacheHelper.invalidatePattern('evidence:*');
+  await cacheHelper.invalidate('stats');
 
   await logActivity({
     user_name: user.name,
@@ -189,6 +198,10 @@ export async function PATCH(
 
   if (error)
     return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Invalidate cache
+  await cacheHelper.invalidatePattern('evidence:*');
+  await cacheHelper.invalidate('stats');
 
   await logActivity({
     user_name: user.name,

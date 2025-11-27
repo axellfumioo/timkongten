@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { logActivity } from "@/app/lib/logActivity";
 import { authOptions } from "@/app/lib/authOptions";
+import { cacheHelper } from "@/lib/redis";
 
 import { randomUUID } from "crypto";
 
@@ -20,35 +21,49 @@ export async function GET(req: Request) {
   const date = searchParams.get("date") || "";
   const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);
 
-  // Supabase query
-  const dbStart = Date.now();
-  const { data: dbData, error } = await supabase.rpc("get_content", {
-    filter_date: date || null,
-    row_limit: limit,
-  });
+  // Cache key berdasarkan parameter
+  const cacheKey = `content:${date || 'all'}:${limit}`;
 
-  const dbTime = Date.now() - dbStart;
+  try {
+    // Gunakan cache helper
+    const dbStart = Date.now();
+    const data = await cacheHelper.getOrSet(
+      cacheKey,
+      async () => {
+        const { data: dbData, error } = await supabase.rpc("get_content", {
+          filter_date: date || null,
+          row_limit: limit,
+        });
 
-  if (error) {
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        return dbData || [];
+      },
+      300 // Cache 5 menit
+    );
+
+    const dbTime = Date.now() - dbStart;
+    const totalTime = Date.now() - totalStart;
+    
+    console.log(
+      `DB query: ${dbTime}ms, Total GET: ${totalTime}ms, Rows: ${data.length}`
+    );
+
+    return NextResponse.json({
+      data,
+      debug: {
+        dbTime,
+        totalTime,
+        limit,
+        dateFilter: date || "none",
+      },
+    });
+  } catch (error: any) {
     console.error("Database error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
-  const data = dbData || [];
-  const totalTime = Date.now() - totalStart;
-  console.log(
-    `DB query: ${dbTime}ms, Total GET: ${totalTime}ms, Rows: ${data.length}`
-  );
-
-  return NextResponse.json({
-    data,
-    debug: {
-      dbTime,
-      totalTime,
-      limit,
-      dateFilter: date || "none",
-    },
-  });
 }
 
 export async function POST(req: NextRequest) {
@@ -116,6 +131,11 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+
+  // Invalidate cache setelah insert
+  await cacheHelper.invalidatePattern('content:*');
+  await cacheHelper.invalidatePattern('evidence:*');
+  await cacheHelper.invalidate('stats');
 
   // Logging async
   logActivity({
