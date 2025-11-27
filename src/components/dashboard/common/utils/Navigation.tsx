@@ -7,8 +7,9 @@ import {
     CalendarCheck,
     NotebookPen,
     User2,
+    CalendarCheck2,
     FolderCheckIcon,
-    LucideIcon, // 👈 type helper
+    LucideIcon,
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useGlobalStore } from '@/app/lib/global-store'
@@ -21,6 +22,7 @@ type NavItem =
 const navigationItems: NavItem[] = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { type: 'divider', label: 'Menu' },
+    { label: 'Schedule', href: '/dashboard/schedule', icon: CalendarCheck2 },
     { label: 'Calendar Of Content', href: '/dashboard/coc', icon: CalendarCheck },
     { label: 'Point Evidence', href: '/dashboard/evidence', icon: NotebookPen },
     { type: 'divider', label: 'Utilitas' },

@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import {
     Menu,
     Download,
+    FolderOpen,
+    SquareArrowUpRight,
 } from 'lucide-react';
 import Sidebar from '@/components/dashboard/common/Sidebar';
 import NotesHeader from '@/components/dashboard/layout/NoteHeader';
@@ -81,7 +83,7 @@ function App() {
                                                             download
                                                             className="flex items-center justify-center gap-2 bg-white text-[#0a0a0a] w-full px-4 py-2 rounded-md font-semibold hover:bg-gray-200 mb-2 text-sm"
                                                         >
-                                                            <Download size={18} /> Download
+                                                            <SquareArrowUpRight size={18} /> Open
                                                         </a>
                                                     ) : (
                                                         <button disabled className="w-full block text-center px-4 py-2 text-sm font-medium text-white/50 bg-gray-800 rounded-lg cursor-not-allowed">
