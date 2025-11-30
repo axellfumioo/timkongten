@@ -25,110 +25,110 @@ const App = () => {
                     </div>
 
                     {/* Main Content */}
-                    <main className="flex-1 px-5 sm:px-10 pt-10 bg-[#0a0a0a] overflow-y-auto">
-                        <div className="mb-6">
-                            <h1 className="text-4xl font-extrabold mb-2">Schedule</h1>
-                            <p className="text-white/50 text-lg">Jadwal penugasan Tim Konten & Brand Ambassador</p>
+                    <main className="flex-1 px-3 sm:px-5 lg:px-10 pt-6 sm:pt-10 bg-[#0a0a0a] overflow-y-auto">
+                        <div className="mb-4 sm:mb-6">
+                            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold mb-2">Schedule</h1>
+                            <p className="text-white/50 text-sm sm:text-base lg:text-lg">Jadwal penugasan Tim Konten & Brand Ambassador</p>
                         </div>
                         <div>
-                            <div className="p-6 space-y-10 bg-[#0a0a0a] min-h-screen text-white">
+                            <div className="pb-6 space-y-6 sm:space-y-8 lg:space-y-10 bg-[#0a0a0a] min-h-screen text-white">
 
                                 {/* TABEL 1 */}
-                                <h2 className="text-2xl font-bold mb-2">Tabel Jadwal Visual Creative Design</h2>
+                                <h2 className="text-xl sm:text-2xl font-bold mb-2">Tabel Jadwal Visual Creative Design</h2>
 
                                 <div className="overflow-x-auto bg-[#111] shadow rounded-xl">
-                                    <table className="min-w-full border border-gray-700 text-white">
+                                    <table className="min-w-full border border-gray-700 text-white text-sm sm:text-base">
                                         <thead className="bg-[#1a1a1a] text-gray-300">
                                             <tr>
-                                                <th className="border border-gray-700 p-3">Minggu</th>
-                                                <th className="border border-gray-700 p-3">Senin</th>
-                                                <th className="border border-gray-700 p-3">Selasa</th>
-                                                <th className="border border-gray-700 p-3">Kamis</th>
-                                                <th className="border border-gray-700 p-3">Minggu</th>
+                                                <th className="border border-gray-700 p-2 sm:p-3 whitespace-nowrap">Minggu</th>
+                                                <th className="border border-gray-700 p-2 sm:p-3 whitespace-nowrap">Senin</th>
+                                                <th className="border border-gray-700 p-2 sm:p-3 whitespace-nowrap">Selasa</th>
+                                                <th className="border border-gray-700 p-2 sm:p-3 whitespace-nowrap">Kamis</th>
+                                                <th className="border border-gray-700 p-2 sm:p-3 whitespace-nowrap">Minggu</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <td className="border border-gray-700 p-3">1</td>
-                                                <td className="border border-gray-700 p-3">Azqi</td>
-                                                <td className="border border-gray-700 p-3">Yihan</td>
-                                                <td className="border border-gray-700 p-3">Queen</td>
-                                                <td className="border border-gray-700 p-3">Bima</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3 text-center">1</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Azqi</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Yihan</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Queen</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Bima</td>
                                             </tr>
                                             <tr>
-                                                <td className="border border-gray-700 p-3">2</td>
-                                                <td className="border border-gray-700 p-3">Hamizano</td>
-                                                <td className="border border-gray-700 p-3">Azqi</td>
-                                                <td className="border border-gray-700 p-3">Yihan</td>
-                                                <td className="border border-gray-700 p-3">Queen</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3 text-center">2</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Hamizano</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Azqi</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Yihan</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Queen</td>
                                             </tr>
                                             <tr>
-                                                <td className="border border-gray-700 p-3">3</td>
-                                                <td className="border border-gray-700 p-3">Bima</td>
-                                                <td className="border border-gray-700 p-3">Hamizano</td>
-                                                <td className="border border-gray-700 p-3">Azqi</td>
-                                                <td className="border border-gray-700 p-3">Yihan</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3 text-center">3</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Bima</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Hamizano</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Azqi</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Yihan</td>
                                             </tr>
                                             <tr>
-                                                <td className="border border-gray-700 p-3">4</td>
-                                                <td className="border border-gray-700 p-3">Queen</td>
-                                                <td className="border border-gray-700 p-3">Bima</td>
-                                                <td className="border border-gray-700 p-3">Hamizano</td>
-                                                <td className="border border-gray-700 p-3">Azqi</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3 text-center">4</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Queen</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Bima</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Hamizano</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Azqi</td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>
 
                                 {/* Brand Ambassador */}
-                                <h3 className="text-xl font-semibold mt-6">Pembagian Shooting Brand Ambassador</h3>
+                                <h3 className="text-lg sm:text-xl font-semibold mt-4 sm:mt-6">Pembagian Shooting Brand Ambassador</h3>
 
-                                <div className="bg-[#111] shadow rounded-xl p-4 text-gray-300">
-                                    <div className="space-y-2">
-                                        <p><span className="font-bold text-white">Minggu Ke-1:</span> Keisya, Tiyas, Enzo, Syafira, Glenvio</p>
-                                        <p><span className="font-bold text-white">Minggu Ke-2:</span> Syahidan, Hafizh, Devan, Hulwa, Griselda</p>
-                                        <p><span className="font-bold text-white">Minggu Ke-3:</span> Raffi, Agustin, Nashwa, Hanif, Lulu</p>
-                                        <p><span className="font-bold text-white">Minggu Ke-4:</span> Arbi, Shaskia, Rafi Rabani, Cressendo, Keyla</p>
+                                <div className="bg-[#111] shadow rounded-xl p-3 sm:p-4 text-gray-300">
+                                    <div className="space-y-2 sm:space-y-3 text-sm sm:text-base">
+                                        <p className="break-words"><span className="font-bold text-white">Minggu Ke-1:</span> Keisya, Tiyas, Enzo, Syafira, Glenvio</p>
+                                        <p className="break-words"><span className="font-bold text-white">Minggu Ke-2:</span> Syahidan, Hafizh, Devan, Hulwa, Griselda</p>
+                                        <p className="break-words"><span className="font-bold text-white">Minggu Ke-3:</span> Raffi, Agustin, Nashwa, Hanif, Lulu</p>
+                                        <p className="break-words"><span className="font-bold text-white">Minggu Ke-4:</span> Arbi, Shaskia, Rafi Rabani, Cressendo, Keyla</p>
                                     </div>
                                 </div>
 
                                 {/* TABEL 2 */}
-                                <h2 className="text-2xl font-bold mt-10">Tabel Jadwal Video Content Production</h2>
+                                <h2 className="text-xl sm:text-2xl font-bold mt-6 sm:mt-10">Tabel Jadwal Video Content Production</h2>
 
                                 <div className="overflow-x-auto bg-[#111] shadow rounded-xl">
-                                    <table className="min-w-full border border-gray-700 text-white">
+                                    <table className="min-w-full border border-gray-700 text-white text-sm sm:text-base">
                                         <thead className="bg-[#1a1a1a] text-gray-300">
                                             <tr>
-                                                <th className="border border-gray-700 p-3">Minggu</th>
-                                                <th className="border border-gray-700 p-3">Senin (Tips)</th>
-                                                <th className="border border-gray-700 p-3">SPMB</th>
-                                                <th className="border border-gray-700 p-3">Kaleidoskop</th>
+                                                <th className="border border-gray-700 p-2 sm:p-3 whitespace-nowrap">Minggu</th>
+                                                <th className="border border-gray-700 p-2 sm:p-3 whitespace-nowrap">Senin (Tips)</th>
+                                                <th className="border border-gray-700 p-2 sm:p-3 whitespace-nowrap">SPMB</th>
+                                                <th className="border border-gray-700 p-2 sm:p-3 whitespace-nowrap">Kaleidoskop</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <td className="border border-gray-700 p-3">1</td>
-                                                <td className="border border-gray-700 p-3">Billy</td>
-                                                <td className="border border-gray-700 p-3">Axel</td>
-                                                <td className="border border-gray-700 p-3">Isa</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3 text-center">1</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Billy</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Axel</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Isa</td>
                                             </tr>
                                             <tr>
-                                                <td className="border border-gray-700 p-3">2</td>
-                                                <td className="border border-gray-700 p-3">Agung</td>
-                                                <td className="border border-gray-700 p-3">Isa</td>
-                                                <td className="border border-gray-700 p-3">Hafiz + Axel</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3 text-center">2</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Agung</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Isa</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3 whitespace-nowrap">Hafiz + Axel</td>
                                             </tr>
                                             <tr>
-                                                <td className="border border-gray-700 p-3">3</td>
-                                                <td className="border border-gray-700 p-3">Rasya + Hanif</td>
-                                                <td className="border border-gray-700 p-3">Billy</td>
-                                                <td className="border border-gray-700 p-3">Axel</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3 text-center">3</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3 whitespace-nowrap">Rasya + Hanif</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Billy</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Axel</td>
                                             </tr>
                                             <tr>
-                                                <td className="border border-gray-700 p-3">4</td>
-                                                <td className="border border-gray-700 p-3">Hanif</td>
-                                                <td className="border border-gray-700 p-3">Agung</td>
-                                                <td className="border border-gray-700 p-3">Isa</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3 text-center">4</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Hanif</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Agung</td>
+                                                <td className="border border-gray-700 p-2 sm:p-3">Isa</td>
                                             </tr>
                                         </tbody>
                                     </table>

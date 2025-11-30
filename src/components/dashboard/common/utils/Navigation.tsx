@@ -10,6 +10,7 @@ import {
     CalendarCheck2,
     FolderCheckIcon,
     LucideIcon,
+    Clapperboard,
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useGlobalStore } from '@/app/lib/global-store'
@@ -26,7 +27,7 @@ const navigationItems: NavItem[] = [
     { label: 'Calendar Of Content', href: '/dashboard/coc', icon: CalendarCheck },
     { label: 'Point Evidence', href: '/dashboard/evidence', icon: NotebookPen },
     { type: 'divider', label: 'Utilitas' },
-    { label: 'Drive Sort', href: '/dashboard/drivesort', icon: FolderCheckIcon },
+    { label: 'Content Writer', href: '/dashboard/contentwriter', icon: Clapperboard },
     { label: 'File Assets', href: '/dashboard/assets', icon: FolderArchive },
 ]
 
