@@ -9,20 +9,6 @@ import ContentModalCOC from '@/components/dashboard/layout/journal/contentModal/
 import { supabase } from '@/app/lib/supabase'
 import { useGlobalStore } from '@/app/lib/global-store'
 
-interface SelectedDate {
-    day: number
-    month: number
-    year: number
-}
-
-function getTodayDate(): SelectedDate {
-    const today = new Date()
-    return {
-        day: today.getDate(),
-        month: today.getMonth(),
-        year: today.getFullYear(),
-    }
-}
 
 const App = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -46,8 +32,24 @@ const App = () => {
                     {/* Main Content */}
                     <main className="flex-1 px-5 sm:px-10 pt-10 bg-[#0a0a0a] overflow-y-auto">
                         <div className="mb-6">
-                            <h1 className="text-4xl font-extrabold mb-2">Drive Sort (Coming Soon)</h1>
-                            <p className="text-white/50 text-lg">Sortir Foto dan VIdeo dari Google Drive</p>
+                            <h1 className="text-4xl font-extrabold mb-2">Content Writer</h1>
+                            <p className="text-white/50 text-lg">Menulis storyboard untuk konten video</p>
+                        </div>
+                        <div className='container'>
+                            <div className='bg-[#1a1a1a] justify-center rounded-lg'>
+                                <form className='flex flex-col px-8 py-10'>
+                                    <div className='flex flex-col mb-4'>
+                                        <input
+                                            className='w-full rounded-lg border border-white/10 bg-white/5 text-white px-4 py-3 placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 transition'
+                                            placeholder='Masukan judul konten'
+                                            minLength={5}
+                                            required
+                                            title='Judul harus minimal 5 karakter'
+                                        />
+                                    </div>
+                                    <button className='bg-white text-[#0a0a0a] px-4 py-2 rounded-md font-semibold hover:bg-gray-200'>Buat storyboard</button>
+                                </form>
+                            </div>
                         </div>
                     </main>
                 </div>
