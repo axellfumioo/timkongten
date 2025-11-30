@@ -391,7 +391,7 @@ function EvidenceDashboard() {
             formPayload.append('evidence_date', formData.evidence_date);
             formPayload.append('evidence_job', formData.evidence_job);
             formPayload.append('content_id', formData.content_id);
-            formPayload.append('completion_proof', fileTo2);
+            formPayload.append('completion_proof', fileToUpload);
 
             const response = await fetch('/api/evidences', { method: 'POST', body: formPayload });
 
