@@ -36,6 +36,8 @@ export default function EvidenceTable() {
 
   const [proofOpen, setProofOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [loadingAction, setLoadingAction] = useState<'accepted' | 'declined' | null>(null)
 
   const updated = useGlobalStore((state) => state.updated)
   const setUpdated = useGlobalStore((state) => state.setUpdated)
@@ -111,6 +113,8 @@ export default function EvidenceTable() {
 
   // ubah status evidence
   const handleStatusChange = async (id: string, newStatus: 'accepted' | 'declined') => {
+    setLoadingId(id)
+    setLoadingAction(newStatus)
     try {
       const res = await fetch(`/api/evidences/${id}`, {
         method: 'PATCH',
@@ -121,12 +125,18 @@ export default function EvidenceTable() {
       const result = await res.json()
       if (!res.ok) {
         console.error(result.error || 'Gagal update status')
+        setLoadingId(null)
+        setLoadingAction(null)
         return
       }
 
-      setUpdated(true)
+      // Refresh table setelah berhasil update
+      await fetchEvidences()
     } catch (err) {
       console.error('Error updating status:', err)
+    } finally {
+      setLoadingId(null)
+      setLoadingAction(null)
     }
   }
 
@@ -241,17 +251,31 @@ export default function EvidenceTable() {
                         <div className="flex justify-center gap-2">
                           <button
                             onClick={() => handleStatusChange(ev.id, 'accepted')}
-                            className="px-3 py-1 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition flex items-center gap-1"
+                            disabled={loadingId === ev.id}
+                            className="px-3 py-1 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <Check size={16} />
-                            <span className="hidden lg:inline">Terima</span>
+                            {loadingId === ev.id && loadingAction === 'accepted' ? (
+                              <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Check size={16} />
+                            )}
+                            <span className="hidden lg:inline">
+                              {loadingId === ev.id && loadingAction === 'accepted' ? 'Loading...' : 'Terima'}
+                            </span>
                           </button>
                           <button
                             onClick={() => handleStatusChange(ev.id, 'declined')}
-                            className="px-3 py-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition flex items-center gap-1"
+                            disabled={loadingId === ev.id}
+                            className="px-3 py-1 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <X size={16} />
-                            <span className="hidden lg:inline">Tolak</span>
+                            {loadingId === ev.id && loadingAction === 'declined' ? (
+                              <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <X size={16} />
+                            )}
+                            <span className="hidden lg:inline">
+                              {loadingId === ev.id && loadingAction === 'declined' ? 'Loading...' : 'Tolak'}
+                            </span>
                           </button>
                         </div>
                       </td>
