@@ -22,5 +22,5 @@ export const uploadToB2 = async (file: File, filename: string, bucket: string) =
 
   await r2.send(command)
 
-  return `https://image.axellfumioo.my.id/humas/${filename}`
+  return `${process.env.PUBLIC_B2_PUBLIC_URL}${filename}`
 }

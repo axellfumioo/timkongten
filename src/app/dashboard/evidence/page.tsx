@@ -374,7 +374,6 @@ function EvidenceDashboard() {
                 return;
             }
 
-            // Kompresi gambar jika file adalah gambar
             let fileToUpload = selectedFile;
             if (selectedFile.type.startsWith('image/')) {
                 try {
@@ -383,7 +382,6 @@ function EvidenceDashboard() {
                     console.log('Ukuran setelah kompresi:', (fileToUpload.size / 1024).toFixed(2), 'KB');
                 } catch (error) {
                     console.error('Gagal kompresi, menggunakan file asli:', error);
-                    // Tetap lanjut dengan file asli jika kompresi gagal
                 }
             }
 
@@ -393,7 +391,7 @@ function EvidenceDashboard() {
             formPayload.append('evidence_date', formData.evidence_date);
             formPayload.append('evidence_job', formData.evidence_job);
             formPayload.append('content_id', formData.content_id);
-            formPayload.append('completion_proof', fileToUpload);
+            formPayload.append('completion_proof', fileTo2);
 
             const response = await fetch('/api/evidences', { method: 'POST', body: formPayload });
 
