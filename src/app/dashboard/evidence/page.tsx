@@ -550,6 +550,9 @@ function EvidenceDashboard() {
                                             ))}
                                         </optgroup>
                                     ))}
+                                    <option className="bg-black text-white" value="other">
+                                        Lainnya
+                                    </option>
                                 </select>
                             </div>
 
