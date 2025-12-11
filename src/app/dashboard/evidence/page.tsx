@@ -308,7 +308,7 @@ function EvidenceDashboard() {
 
                     while (attempts < maxAttempts) {
                         blob = await compressWithQuality(quality);
-                        
+
                         if (!blob) {
                             break;
                         }
@@ -548,11 +548,11 @@ function EvidenceDashboard() {
                                                     {item.content_title}
                                                 </option>
                                             ))}
+                                            <option className="bg-black text-white" value="other">
+                                                Lainnya
+                                            </option>
                                         </optgroup>
                                     ))}
-                                    <option className="bg-black text-white" value="other">
-                                        Lainnya
-                                    </option>
                                 </select>
                             </div>
 
