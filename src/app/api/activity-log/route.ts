@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/authOptions";
 import { query } from "@/app/lib/postgres";
+import { cacheHelper } from "@/lib/redis";
 
 // Helper function to fetch data
 async function fetchData(
@@ -41,7 +42,7 @@ async function fetchData(
 
   const dataParams = [...params, pageSize, offset];
   const dataResult = await query(
-    `SELECT user_email, user_name, activity_type, activity_name, activity_message, activity_date FROM activity_logs ${whereSql} ORDER BY activity_date DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    `SELECT id, user_email, user_name, activity_type, activity_name, activity_message, activity_date FROM activity_logs ${whereSql} ORDER BY activity_date DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
     dataParams
   );
 
@@ -94,6 +95,8 @@ export async function POST(req: NextRequest) {
       ]
     );
 
+    await cacheHelper.invalidatePattern("activity-log:*");
+
     return NextResponse.json(
       { success: true, data: result.rows },
       { status: 201 }
@@ -124,13 +127,19 @@ export async function GET(req: NextRequest) {
   const pageSize = Math.min(parseInt(searchParams.get("pageSize") || "10"), 100);
 
   try {
-    // Fetch data from database
-    const response = await fetchData(search, type, page, pageSize);
+    const cacheKey = `activity-log:${search || "all"}:${type || "all"}:${page}:${pageSize}`;
+
+    // Fetch data from database (with cache)
+    const response = await cacheHelper.getOrSet(
+      cacheKey,
+      () => fetchData(search, type, page, pageSize),
+      60
+    );
 
     return NextResponse.json(response, { 
       status: 200,
       headers: {
-        'Cache-Control': 'public, max-age=60',
+        "Cache-Control": "private, max-age=60",
       }
     });
   } catch (err) {

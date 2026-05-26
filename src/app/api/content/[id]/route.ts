@@ -22,11 +22,17 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Query langsung dari database
-  const result = await query("SELECT * FROM content WHERE id = $1 LIMIT 1", [
-    id,
-  ]);
-  const data = result.rows[0];
+  const cacheKey = `content:id:${id}`;
+  const data = await cacheHelper.getOrSet(
+    cacheKey,
+    async () => {
+      const result = await query("SELECT * FROM content WHERE id = $1 LIMIT 1", [
+        id,
+      ]);
+      return result.rows[0] ?? null;
+    },
+    300
+  );
 
   if (!data) {
     return NextResponse.json({ error: "Content not found" }, { status: 404 });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { query } from "@/app/lib/postgres";
+import { cacheHelper } from "@/lib/redis";
 
 export async function DELETE(req: Request) {
   try {
@@ -24,6 +25,8 @@ export async function DELETE(req: Request) {
         { status: 404 }
       );
     }
+
+    await cacheHelper.invalidatePattern("admin:users:*");
 
     return NextResponse.json(
       { message: "User deleted successfully", data: result.rows },

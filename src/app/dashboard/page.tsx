@@ -1,9 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   BookCheck,
-  CalendarDays,
   CheckCircle,
   Menu,
 } from 'lucide-react';
@@ -44,6 +43,7 @@ function App() {
     scheduled: 0
   });
   const [loading, setLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const formatted = new Date(
     selectedDate.year,
@@ -56,31 +56,36 @@ function App() {
     year: 'numeric',
   });
 
-  useEffect(() => {
+  const fetchStats = useCallback(async () => {
     if (!user?.email) return;
 
     setLoading(true);
+    try {
+      const response = await fetch(`/api/stats`);
+      if (!response.ok) throw new Error("Failed to fetch stats");
+      const data = await response.json();
 
-    const fetchStats = async () => {
-      try {
-        const response = await fetch(`/api/stats`);
-        if (!response.ok) throw new Error("Failed to fetch stats");
-        const data = await response.json();
+      setStats({
+        content: data.stats?.total_contents || 0,
+        evidence: data.stats?.total_evidences || 0,
+        scheduled: 0
+      });
+      setLastUpdated(
+        new Date().toLocaleTimeString('id-ID', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      );
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.email]);
 
-        setStats({
-          content: data.stats?.total_contents || 0,
-          evidence: data.stats?.total_evidences || 0, // contoh, ganti sesuai kebutuhan
-          scheduled: 0 // kalo API belum ada scheduled, bisa dikasih default 0
-        });
-      } catch (error) {
-        console.error("Error fetching stats:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  useEffect(() => {
     fetchStats();
-  }, [selectedDate, user?.email]);
+  }, [fetchStats]);
 
   return (
     <AuthGuard>
@@ -100,21 +105,35 @@ function App() {
           <main className="flex-1 px-5 sm:px-10 pt-10 bg-[#0a0a0a] mt-0 md:mt-0 overflow-y-auto">
             <div className="mb-6">
               <h1 className="text-4xl font-extrabold tracking-tight mb-2">Hey {user?.name?.substring(0, 12)}! 😀</h1>
-              <p className="text-white/50 text-lg">
-                Statistik konten SMK Telkom Purwokerto
-              </p>
+              <div className="flex flex-wrap items-center gap-3 text-white/50 text-lg">
+                <span>Statistik konten SMK Telkom Purwokerto</span>
+                <button
+                  onClick={fetchStats}
+                  disabled={loading}
+                  className="text-xs px-3 py-1 rounded-full border border-white/10 text-white/70 hover:text-white hover:border-white/20 transition disabled:opacity-50"
+                >
+                  Refresh
+                </button>
+                {lastUpdated && (
+                  <span className="text-xs text-white/40">Update {lastUpdated}</span>
+                )}
+              </div>
             </div>
 
             <section className="mb-12">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-6 bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl transition-all">
                   <CheckCircle className="text-green-400 mb-2" />
-                  <p className="text-3xl font-bold">{loading ? "..." : stats.content}</p>
+                  <p className={`text-3xl font-bold ${loading ? "text-white/40 animate-pulse" : ""}`}>
+                    {loading ? "—" : stats.evidence}
+                  </p>
                   <p className="text-sm text-gray-400">Total Evidence (semua siswa)</p>
                 </div>
                 <div className="p-6 bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl transition-all">
                   <BookCheck className="text-indigo-400 mb-2" />
-                  <p className="text-3xl font-bold">{loading ? "..." : stats.evidence}</p>
+                  <p className={`text-3xl font-bold ${loading ? "text-white/40 animate-pulse" : ""}`}>
+                    {loading ? "—" : stats.content}
+                  </p>
                   <p className="text-sm text-gray-400">Total Konten (semua siswa)</p>
                 </div>
               </div>

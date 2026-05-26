@@ -19,15 +19,20 @@ export default function ActivityLogList() {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterType, setFilterType] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalLogs, setTotalLogs] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const fetchLogs = async () => {
     setIsLoading(true);
+    setErrorMessage('');
     try {
       const res = await fetch(
-        `/api/activity-log?search=${encodeURIComponent(search)}&type=${encodeURIComponent(filterType)}&page=${page}&pageSize=5`
+        `/api/activity-log?search=${encodeURIComponent(debouncedSearch)}&type=${encodeURIComponent(filterType)}&page=${page}&pageSize=5`
       );
 
       if (!res.ok) {
@@ -39,10 +44,19 @@ export default function ActivityLogList() {
 
       setLogs(logsData);
       setTotalPages(Number(data.pagination?.totalPages) || 1);
+      setTotalLogs(Number(data.pagination?.total) || logsData.length);
+      setLastUpdated(
+        new Date().toLocaleTimeString('id-ID', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      );
     } catch (error) {
       console.error('Gagal fetch logs:', error);
+      setErrorMessage('Gagal memuat activity log. Coba lagi sebentar.');
       setLogs([]);
       setTotalPages(1);
+      setTotalLogs(0);
     } finally {
       setIsLoading(false);
     }
@@ -50,10 +64,20 @@ export default function ActivityLogList() {
 
   useEffect(() => {
     fetchLogs();
-  }, [search, filterType, page]);
+  }, [debouncedSearch, filterType, page]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [search]);
 
   return (
-    <div className="bg-white/3 rounded-2xl border border-white/10 shadow-xl p-6 w-full text-white">
+    <div
+      className="bg-white/3 rounded-2xl border border-white/10 shadow-xl p-6 w-full text-white"
+      aria-busy={isLoading}
+    >
       {/* Filter & Search */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 mb-6">
         <div className="flex items-center w-full md:w-auto bg-[#1a1a1a] border border-white/10 rounded-lg overflow-hidden">
@@ -72,20 +96,47 @@ export default function ActivityLogList() {
           />
         </div>
 
-        <select
-          className="bg-[#1a1a1a] border border-white/10 text-sm text-white px-4 py-2 rounded-lg"
-          value={filterType}
-          onChange={(e) => {
-            setFilterType(e.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">Semua Tipe</option>
-          <option value="auth">Auth</option>
-          <option value="content">Content</option>
-          <option value="evidence">Point Evidence</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            className="bg-[#1a1a1a] border border-white/10 text-sm text-white px-4 py-2 rounded-lg"
+            value={filterType}
+            onChange={(e) => {
+              setFilterType(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">Semua Tipe</option>
+            <option value="auth">Auth</option>
+            <option value="content">Content</option>
+            <option value="evidence">Point Evidence</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch('');
+              setFilterType('');
+              setPage(1);
+            }}
+            disabled={!search && !filterType}
+            className="px-3 py-2 text-xs rounded-lg border border-white/10 text-white/70 hover:text-white hover:border-white/20 transition disabled:opacity-40"
+          >
+            Reset
+          </button>
+        </div>
       </div>
+
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-white/50 mb-4">
+        <span>
+          {isLoading
+            ? 'Memuat data...'
+            : `Menampilkan ${logs.length} dari ${totalLogs} log`}
+        </span>
+        {lastUpdated && <span>Update {lastUpdated}</span>}
+      </div>
+
+      {errorMessage && (
+        <div className="text-sm text-red-300 mb-4">{errorMessage}</div>
+      )}
 
       {/* Loading */}
       {isLoading ? (
@@ -96,9 +147,9 @@ export default function ActivityLogList() {
         <p className="text-white/40 text-center italic py-10">Tidak ada log ditemukan.</p>
       ) : (
         <ul className="space-y-4 text-sm">
-          {logs.map((log) => (
+          {logs.map((log, index) => (
             <li
-              key={log.id}
+              key={log.id || `${log.activity_date || 'log'}-${index}`}
               className="bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl py-4 px-4 transition-all duration-200 group"
             >
               <div className="flex items-start justify-between">

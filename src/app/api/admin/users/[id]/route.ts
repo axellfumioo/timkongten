@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/authOptions";
 import { query } from "@/app/lib/postgres";
+import { cacheHelper } from "@/lib/redis";
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,6 +32,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    await cacheHelper.invalidatePattern("admin:users:*");
+
     return NextResponse.json(result.rows[0]);
   } catch (error: any) {
     console.error("PUT /admin/users/[id] error:", error);
@@ -53,6 +56,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     if (result.rowCount === 0) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+
+    await cacheHelper.invalidatePattern("admin:users:*");
 
     return NextResponse.json({ message: "User deleted successfully" });
   } catch (error: any) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { query } from "@/app/lib/postgres";
+import { cacheHelper } from "@/lib/redis";
 
 export async function POST(req: Request) {
   try {
@@ -26,6 +27,8 @@ export async function POST(req: Request) {
         [newUser.name, newUser.email, newUser.role]
       );
       data = result.rows;
+
+      await cacheHelper.invalidatePattern("admin:users:*");
     } catch (error: any) {
       if (error?.code === "23505") {
         return NextResponse.json(

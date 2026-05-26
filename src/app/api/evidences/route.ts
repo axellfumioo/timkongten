@@ -176,6 +176,7 @@ export async function POST(req: Request) {
     await cacheHelper.invalidatePattern(`evidence:${user_email}:*`);
     await cacheHelper.invalidatePattern('evidence:all:*');
     await cacheHelper.invalidate('stats');
+    await cacheHelper.invalidatePattern('admin:evidences:*');
 
     return NextResponse.json(
       { message: "Evidence created successfully", url: fileUrl, profiling },

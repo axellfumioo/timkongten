@@ -30,10 +30,17 @@ export async function GET(
   if (!user?.email)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const result = await query("SELECT * FROM evidence WHERE id = $1 LIMIT 1", [
-    id,
-  ]);
-  const data = result.rows[0];
+  const cacheKey = `evidence:id:${id}`;
+  const data = await cacheHelper.getOrSet(
+    cacheKey,
+    async () => {
+      const result = await query("SELECT * FROM evidence WHERE id = $1 LIMIT 1", [
+        id,
+      ]);
+      return result.rows[0] ?? null;
+    },
+    300
+  );
 
   if (!data)
     return NextResponse.json({ error: "Evidence not found" }, { status: 404 });
@@ -107,6 +114,7 @@ export async function PUT(
   // Invalidate cache
   await cacheHelper.invalidatePattern('evidence:*');
   await cacheHelper.invalidate('stats');
+  await cacheHelper.invalidatePattern('admin:evidences:*');
 
   await logActivity({
     user_name: user.name,
@@ -151,6 +159,7 @@ export async function DELETE(
   // Invalidate cache
   await cacheHelper.invalidatePattern('evidence:*');
   await cacheHelper.invalidate('stats');
+  await cacheHelper.invalidatePattern('admin:evidences:*');
 
   await logActivity({
     user_name: user.name,
@@ -207,6 +216,7 @@ export async function PATCH(
   // Invalidate cache
   await cacheHelper.invalidatePattern('evidence:*');
   await cacheHelper.invalidate('stats');
+  await cacheHelper.invalidatePattern('admin:evidences:*');
 
   await logActivity({
     user_name: user.name,

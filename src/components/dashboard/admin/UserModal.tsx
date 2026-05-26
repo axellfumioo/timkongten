@@ -10,6 +10,7 @@ export default function UserModal({ isOpen, onClose, selectedUser }: any) {
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
     const [role, setRole] = useState('')
+    const [isSaving, setIsSaving] = useState(false)
     const triggerUpdate = useGlobalStore((state) => state.triggerUpdate)
 
     useEffect(() => {
@@ -28,7 +29,6 @@ export default function UserModal({ isOpen, onClose, selectedUser }: any) {
 
     const handleSave = async () => {
         if (!name || !email || !role) {
-            onClose();
             new Toast({
                 position: "top-right",
                 toastMsg: "Semua field harus diisi!",
@@ -42,26 +42,7 @@ export default function UserModal({ isOpen, onClose, selectedUser }: any) {
             return;
         }
 
-        const dataToSave = { name, email, role };
-
-        let res;
-
-        if (selectedUser) {
-            res = await fetch(`/api/admin/users/${selectedUser.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(dataToSave)
-            });
-        } else {
-            res = await fetch('/api/admin/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(dataToSave)
-            });
-        }
-
         if (!email.endsWith('@student.smktelkom-pwt.sch.id')) {
-            onClose();
             new Toast({
                 position: "top-right",
                 toastMsg: "Email harus pakai domain sekolah!",
@@ -72,15 +53,53 @@ export default function UserModal({ isOpen, onClose, selectedUser }: any) {
             return;
         }
 
-        if (!res.ok) {
-            const data = await res.json();
-            console.error("❌ API Error:", data.error);
-            alert("Gagal menyimpan data: " + data.error);
-            return;
-        }
+        const dataToSave = { name, email, role };
+        setIsSaving(true)
 
-        triggerUpdate();
-        onClose();
+        try {
+            let res;
+
+            if (selectedUser) {
+                res = await fetch(`/api/admin/users/${selectedUser.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dataToSave)
+                });
+            } else {
+                res = await fetch('/api/admin/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dataToSave)
+                });
+            }
+
+            if (!res.ok) {
+                const data = await res.json();
+                console.error("❌ API Error:", data.error);
+                new Toast({
+                    position: "top-right",
+                    toastMsg: `Gagal menyimpan data: ${data.error || 'Unknown error'}`,
+                    autoCloseTime: 3000,
+                    type: "error",
+                    theme: "dark"
+                });
+                return;
+            }
+
+            triggerUpdate();
+            onClose();
+        } catch (error: any) {
+            console.error("❌ API Error:", error);
+            new Toast({
+                position: "top-right",
+                toastMsg: "Gagal menyimpan data. Coba lagi.",
+                autoCloseTime: 3000,
+                type: "error",
+                theme: "dark"
+            });
+        } finally {
+            setIsSaving(false)
+        }
     };
 
 
@@ -146,9 +165,10 @@ export default function UserModal({ isOpen, onClose, selectedUser }: any) {
                         <button
                             type="button"
                             onClick={handleSave}
-                            className="px-5 py-2 bg-white text-black rounded-md font-semibold hover:bg-gray-200 transition"
+                            disabled={isSaving}
+                            className="px-5 py-2 bg-white text-black rounded-md font-semibold hover:bg-gray-200 transition disabled:opacity-60"
                         >
-                            Simpan
+                            {isSaving ? 'Menyimpan...' : 'Simpan'}
                         </button>
                     </div>
                 </form>
