@@ -58,7 +58,6 @@ export default function TodoList() {
         console.error('Error fetching events:', error)
         setEvents([])
       } finally {
-      } finally {
         setIsLoading(false)
       }
     }
