@@ -1,22 +1,30 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { supabase } from "@/app/lib/supabase";
 import { validateUser } from "@/app/lib/validateUser";
 import { logActivity } from "@/app/lib/logActivity";
+import { query } from "@/app/lib/postgres";
 
 async function getUserFromDB(email: string) {
-  const { data } = await supabase
-    .from("users")
-    .select("role, email, name")
-    .eq("email", email)
-    .single();
+  try {
+    const result = await query<{
+      role: string;
+      email: string;
+      name: string;
+    }>("SELECT role, email, name FROM users WHERE email = $1 LIMIT 1", [
+      email,
+    ]);
 
-  if (!data) return null;
-  return {
-    role: data.role,
-    email: data.email,
-    name: data.name,
-  };
+    const data = result.rows[0];
+    if (!data) return null;
+    return {
+      role: data.role,
+      email: data.email,
+      name: data.name,
+    };
+  } catch (error) {
+    console.error("Failed loading user from database:", error);
+    return null;
+  }
 }
 
 export const authOptions: NextAuthOptions = {

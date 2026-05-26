@@ -5,12 +5,11 @@ import {
     Eye, Edit, TrashIcon, Search, CalendarDays, Plus, UploadCloud, BarChart2, Briefcase,
     Menu,
     Loader2,
-    Save
+    Save, CheckCircle2, ChevronDown, ChevronUp, X, File as FileIcon
 } from 'lucide-react';
 import Sidebar from '@/components/dashboard/common/Sidebar';
 import AuthGuard from '@/components/AuthGuard';
 import ConfirmationModal from '@/components/dashboard/layout/confirmationModal';
-import ContentModal from '@/components/dashboard/layout/contentModal';
 import Toast from 'typescript-toastify';
 import { useGlobalStore } from '@/app/lib/global-store';
 import { useSession } from "next-auth/react"
@@ -27,12 +26,361 @@ interface Evidence {
     job: string;
     status: EvidenceStatus;
     date: string;
+    content_id?: string;
 }
 
 const monthNames = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
     'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
 ];
+
+// Fungsi kompresi gambar dengan target maksimal 300KB
+const compressImage = async (file: File): Promise<File> => {
+    const MAX_FILE_SIZE = 300 * 1024; // 300KB dalam bytes
+
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = async () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                if (!ctx) {
+                    reject(new Error('Gagal membuat canvas context'));
+                    return;
+                }
+
+                // Mulai dengan dimensi yang lebih kecil untuk hasil yang lebih baik
+                let MAX_WIDTH = 1280;
+                let MAX_HEIGHT = 1280;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height = (height * MAX_WIDTH) / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width = (width * MAX_HEIGHT) / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const compressWithQuality = (quality: number): Promise<Blob | null> => {
+                    return new Promise((res) => {
+                        canvas.toBlob((blob) => res(blob), 'image/jpeg', quality);
+                    });
+                };
+
+                let quality = 0.85;
+                let blob: Blob | null = null;
+                let attempts = 0;
+                const maxAttempts = 10;
+
+                while (attempts < maxAttempts) {
+                    blob = await compressWithQuality(quality);
+                    if (!blob || blob.size <= MAX_FILE_SIZE) break;
+
+                    quality -= 0.1;
+                    attempts++;
+
+                    if (quality < 0.4 && blob.size > MAX_FILE_SIZE) {
+                        width = Math.floor(width * 0.8);
+                        height = Math.floor(height * 0.8);
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(img, 0, 0, width, height);
+                        quality = 0.7;
+                    }
+                }
+
+                if (blob) {
+                    const compressedFile = new File([blob], file.name, {
+                        type: 'image/jpeg',
+                        lastModified: Date.now(),
+                    });
+                    resolve(compressedFile);
+                } else {
+                    reject(new Error('Gagal kompresi gambar'));
+                }
+            };
+            img.onerror = () => reject(new Error('Gagal memuat gambar'));
+        };
+        reader.onerror = () => reject(new Error('Gagal membaca file'));
+    });
+};
+
+
+// Komponen Batch Upload untuk CoC Checklist
+function QuickAddRow({ content, onUpload }: { content: any, onUpload: (content: any, entries: any[], job: string) => Promise<boolean> }) {
+    const [entries, setEntries] = useState([{ id: Date.now(), date: content.content_date, file: null as File | null }]);
+    const [job, setJob] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleUpload = async () => {
+        const validEntries = entries.filter(e => e.date);
+        if (validEntries.length === 0 || !job) {
+            new Toast({ position: 'top-right', toastMsg: 'Pilih tugas dan minimal lengkapi 1 baris tanggal!', type: 'error', theme: 'dark' });
+            return;
+        }
+        setLoading(true);
+        const success = await onUpload(content, validEntries, job);
+        setLoading(false);
+        if (success) {
+            setEntries([{ id: Date.now(), date: content.content_date, file: null }]);
+            setJob('');
+        }
+    };
+
+    const addEntry = () => setEntries([...entries, { id: Date.now(), date: content.content_date, file: null }]);
+    const removeEntry = (id: number) => setEntries(entries.filter(e => e.id !== id));
+    const updateEntry = (id: number, field: string, value: any) => {
+        setEntries(entries.map(e => e.id === id ? { ...e, [field]: value } : e));
+    };
+
+    return (
+        <div className="group flex flex-col gap-5 p-6 bg-gradient-to-br from-white/[0.05] to-transparent backdrop-blur-lg border border-white/10 hover:border-white/20 rounded-3xl transition-all duration-500 shadow-xl hover:shadow-2xl hover:shadow-white/5">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 pb-4 border-b border-white/10">
+                <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-bold uppercase tracking-wider border border-blue-500/20">
+                            {content.content_type || 'Konten'}
+                        </span>
+                        <span className="text-xs text-white/50 font-medium flex items-center gap-1">
+                            <CalendarDays size={12} /> {content.content_date}
+                        </span>
+                    </div>
+                    <h4 className="font-extrabold text-xl text-white line-clamp-1 tracking-tight">{content.content_title}</h4>
+                </div>
+                
+                <div className="w-full lg:w-auto relative">
+                    <Briefcase size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
+                    <select 
+                        value={job} 
+                        onChange={(e) => setJob(e.target.value)}
+                        className="appearance-none bg-black/40 border border-white/10 hover:border-white/20 rounded-xl pl-11 pr-10 py-3 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-white/20 w-full lg:w-auto min-w-[220px] transition-all cursor-pointer"
+                    >
+                        <option value="" disabled className="text-white/50">Pilih tugas spesifik...</option>
+                        <option value="Edit/Design Konten" className="bg-[#121212]">Edit/Design Konten</option>
+                        <option value="Take Video" className="bg-[#121212]">Take Video</option>
+                        <option value="Content Production" className="bg-[#121212]">Content Production</option>
+                        <option value="Pemotretan, Dokumentasi" className="bg-[#121212]">Pemotretan / Dokumentasi</option>
+                        <option value="Sosialisasi" className="bg-[#121212]">Sosialisasi</option>
+                        <option value="Lainnya" className="bg-[#121212]">Lainnya</option>
+                    </select>
+                    <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                </div>
+            </div>
+
+            <div className="space-y-3">
+                <div className="flex items-center justify-between mb-3 px-1">
+                    <span className="text-xs font-bold text-white/40 uppercase tracking-widest">Daftar Evidence</span>
+                    <button type="button" onClick={addEntry} className="text-xs bg-white/5 hover:bg-white/15 text-white px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-all border border-white/10 hover:border-white/20">
+                        <Plus size={14} /> Tambah Baris
+                    </button>
+                </div>
+
+                <div className="space-y-3">
+                    {entries.map((entry, index) => (
+                        <div key={entry.id} className="group/row flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-black/20 p-2 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+                            <div className="relative w-full sm:w-[160px]">
+                                <CalendarDays size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
+                                <input 
+                                    type="date" 
+                                    value={entry.date}
+                                    onChange={(e) => updateEntry(entry.id, 'date', e.target.value)}
+                                    className="bg-transparent border border-white/10 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20 w-full hover:bg-white/5 transition-all"
+                                />
+                            </div>
+                            
+                            <div className="relative border border-white/10 rounded-xl px-4 py-3 bg-white/5 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-3 flex-1 w-full transition-all group-hover/row:border-white/20">
+                                <div className={`p-1.5 rounded-lg ${entry.file ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-white/50'}`}>
+                                    <UploadCloud size={16} />
+                                </div>
+                                <span className={`truncate flex-1 text-left font-medium ${entry.file ? 'text-white' : 'text-white/50'}`}>
+                                    {entry.file ? entry.file.name : "Unggah File Bukti (Opsional)"}
+                                </span>
+                                <input type="file" accept="image/*,.pdf" onChange={(e) => { if(e.target.files?.[0]) updateEntry(entry.id, 'file', e.target.files[0]) }} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                            </div>
+
+                            {entries.length > 1 && (
+                                <button onClick={() => removeEntry(entry.id)} className="p-3 text-white/30 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all border border-transparent hover:border-red-400/20">
+                                    <TrashIcon size={18} />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+                <button 
+                    onClick={handleUpload} 
+                    disabled={loading || !job || entries.filter(e => e.date).length === 0}
+                    className="bg-white text-black hover:bg-gray-200 rounded-xl px-8 py-3 text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-white/10 hover:shadow-white/20 hover:-translate-y-0.5 active:translate-y-0"
+                >
+                    {loading ? (
+                        <span className="flex items-center gap-2"><Loader2 size={18} className="animate-spin text-black" /> Memproses...</span>
+                    ) : (
+                        <span className="flex items-center gap-2"><Save size={18} className="text-black" /> Simpan {entries.filter(e => e.date).length > 0 ? entries.filter(e => e.date).length : ''} Evidence</span>
+                    )}
+                </button>
+            </div>
+        </div>
+    )
+}
+
+// Komponen Batch Upload Manual
+function QuickAddManualForm({ onUploadManual }: { onUploadManual: (formData: any, entries: any[]) => Promise<boolean> }) {
+    const [entries, setEntries] = useState([{ id: Date.now(), date: '', file: null as File | null }]);
+    const [formData, setFormData] = useState({
+        evidence_title: '',
+        evidence_description: '',
+        evidence_job: ''
+    });
+    const [loading, setLoading] = useState(false);
+    const [isOpen, setIsOpen] = useState(false);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+    };
+
+    const addEntry = () => setEntries([...entries, { id: Date.now(), date: '', file: null }]);
+    const removeEntry = (id: number) => setEntries(entries.filter(e => e.id !== id));
+    const updateEntry = (id: number, field: string, value: any) => {
+        setEntries(entries.map(e => e.id === id ? { ...e, [field]: value } : e));
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const validEntries = entries.filter(e => e.date);
+
+        if (!formData.evidence_title || !formData.evidence_job || validEntries.length === 0) {
+            new Toast({ position: 'top-right', toastMsg: 'Lengkapi judul, tugas, dan minimal 1 baris tanggal!', type: 'error', theme: 'dark' });
+            return;
+        }
+        setLoading(true);
+        const success = await onUploadManual(formData, validEntries);
+        setLoading(false);
+        if (success) {
+            setFormData({ evidence_title: '', evidence_description: '', evidence_job: '' });
+            setEntries([{ id: Date.now(), date: '', file: null }]);
+            setIsOpen(false);
+        }
+    };
+
+    return (
+        <div className={`bg-gradient-to-br from-white/[0.04] to-transparent border border-white/10 rounded-3xl overflow-hidden mb-8 transition-all duration-500 shadow-xl ${isOpen ? 'shadow-white/5 ring-1 ring-white/10' : 'hover:bg-white/[0.06] hover:border-white/20'}`}>
+            <button 
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between p-6 transition-all group"
+            >
+                <div className="flex items-center gap-4">
+                    <div className={`p-2.5 rounded-xl transition-all duration-300 ${isOpen ? 'bg-white text-black rotate-45 shadow-lg shadow-white/20' : 'bg-white/10 text-white group-hover:bg-white/20'}`}>
+                        <Plus size={20} />
+                    </div>
+                    <div className="text-left">
+                        <h3 className="text-base font-bold text-white tracking-tight">Buat Evidence Manual</h3>
+                        <p className="text-xs text-white/40 mt-0.5">Catat pekerjaan yang tidak ada di Calendar of Content (Mendukung Batch Upload)</p>
+                    </div>
+                </div>
+                {isOpen ? <ChevronUp size={24} className="text-white/40" /> : <ChevronDown size={24} className="text-white/40 group-hover:text-white/60 transition-colors" />}
+            </button>
+            
+            <div className={`transition-all duration-500 ease-in-out origin-top ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'}`}>
+                <div className="p-6 pt-0 border-t border-white/5">
+                    <form className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6" onSubmit={handleSubmit}>
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-white/50 uppercase tracking-widest pl-1">Judul Pekerjaan</label>
+                            <input name="evidence_title" type="text" value={formData.evidence_title} onChange={handleChange} placeholder="Ketik judul singkat dan jelas..." className="w-full rounded-xl border border-white/10 bg-black/30 text-white px-5 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all placeholder:text-white/20" />
+                        </div>
+                        <div className="space-y-2 relative">
+                            <label className="text-xs font-bold text-white/50 uppercase tracking-widest pl-1">Kategori Tugas</label>
+                            <div className="relative">
+                                <Briefcase size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
+                                <select name="evidence_job" value={formData.evidence_job} onChange={handleChange} className="appearance-none w-full rounded-xl border border-white/10 bg-black/30 text-white pl-11 pr-10 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all cursor-pointer">
+                                    <option className="bg-[#121212] text-white/50" value="" disabled>Pilih kategori...</option>
+                                    <option className="bg-[#121212] text-white" value="Edit/Design Konten">Edit/Design Konten</option>
+                                    <option className="bg-[#121212] text-white" value="Take Video">Take Video</option>
+                                    <option className="bg-[#121212] text-white" value="Content Production">Content Production</option>
+                                    <option className="bg-[#121212] text-white" value="Pemotretan, Dokumentasi">Pemotretan / Dokumentasi</option>
+                                    <option className="bg-[#121212] text-white" value="Sosialisasi">Sosialisasi</option>
+                                    <option className="bg-[#121212] text-white" value="Lainnya">Lainnya</option>
+                                </select>
+                                <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
+                            </div>
+                        </div>
+                        <div className="md:col-span-2 space-y-2">
+                            <label className="text-xs font-bold text-white/50 uppercase tracking-widest pl-1">Keterangan Tambahan</label>
+                            <textarea name="evidence_description" value={formData.evidence_description} onChange={handleChange} placeholder="Ceritakan detail pengerjaan atau cantumkan link relevan..." className="w-full rounded-xl border border-white/10 bg-black/30 text-white px-5 py-4 h-24 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-white/20 transition-all placeholder:text-white/20" />
+                        </div>
+                        
+                        <div className="md:col-span-2 mt-4 p-5 bg-black/20 rounded-2xl border border-white/5">
+                            <div className="flex items-center justify-between mb-5 px-1">
+                                <label className="text-xs font-bold text-white/50 uppercase tracking-widest">Daftar Baris Evidence</label>
+                                <button type="button" onClick={addEntry} className="text-xs bg-white/5 hover:bg-white/15 text-white px-3 py-2 rounded-lg font-bold flex items-center gap-1.5 transition-all border border-white/10 hover:border-white/20">
+                                    <Plus size={14} /> Tambah Baris
+                                </button>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                {entries.map((entry, index) => (
+                                    <div key={entry.id} className="group/row flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-white/[0.02] p-2 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+                                        <div className="relative w-full sm:w-[170px]">
+                                            <CalendarDays size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
+                                            <input 
+                                                type="date" 
+                                                value={entry.date}
+                                                onChange={(e) => updateEntry(entry.id, 'date', e.target.value)}
+                                                className="bg-black/30 border border-white/10 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20 w-full hover:bg-white/5 transition-all"
+                                            />
+                                        </div>
+                                        
+                                        <div className="relative border border-white/10 rounded-xl px-4 py-3 bg-white/5 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-3 flex-1 w-full transition-all group-hover/row:border-white/20">
+                                            <div className={`p-1.5 rounded-lg ${entry.file ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-white/50'}`}>
+                                                <UploadCloud size={16} />
+                                            </div>
+                                            <span className={`truncate flex-1 text-left font-medium ${entry.file ? 'text-white' : 'text-white/50'}`}>
+                                                {entry.file ? entry.file.name : "Unggah File Bukti (Opsional)"}
+                                            </span>
+                                            <input type="file" accept="image/*,.pdf" onChange={(e) => { if(e.target.files?.[0]) updateEntry(entry.id, 'file', e.target.files[0]) }} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                                        </div>
+
+                                        {entries.length > 1 && (
+                                            <button type="button" onClick={() => removeEntry(entry.id)} className="p-3 text-white/30 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all border border-transparent hover:border-red-400/20">
+                                                <TrashIcon size={18} />
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="md:col-span-2 flex justify-end gap-3 pt-4 border-t border-white/5 mt-2">
+                            <button type="submit" disabled={loading} className="bg-white text-black hover:bg-gray-200 rounded-xl px-8 py-3.5 text-sm font-extrabold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-white/10 hover:shadow-white/20 hover:-translate-y-0.5 active:translate-y-0">
+                                {loading ? (
+                                    <span className="flex items-center gap-2"><Loader2 size={18} className="animate-spin text-black" /> Memproses...</span>
+                                ) : (
+                                    <span className="flex items-center gap-2"><Save size={18} className="text-black" /> Simpan Semua Evidence</span>
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    )
+}
 
 function EvidenceDashboard() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -43,32 +391,19 @@ function EvidenceDashboard() {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [contentModalOpen, setContentModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [modalOpen, setModalOpen] = useState(false);
     const [proofOpen, setProofOpen] = useState(false);
     const { data: session, status } = useSession()
     const [acceptedEvidenceTotal, setAcceptedEvidenceTotal] = useState(0);
-    const setUpdated = useGlobalStore((state) => state.setUpdated)
-    const updated = useGlobalStore((state) => state.updated)
+    const triggerUpdate = useGlobalStore((state) => state.triggerUpdate)
+    const updateTrigger = useGlobalStore((state) => state.updateTrigger)
     const [evidenceData, setEvidenceData] = useState<Evidence[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedContent, setSelectedContent] = useState<any | null>(null)
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [selectedId, setSelectedId] = useState('');
-    const [loadingSubmit, setLoadingSubmit] = useState(false);
     const [loadingDelete, setLoadingDelete] = useState(false);
     const [contents, setContents] = useState<any[]>([]);
     const [loadingContents, setLoadingContents] = useState(false);
-
-    // data form
-    const [formData, setFormData] = useState({
-        evidence_title: '',
-        content_id: '',
-        evidence_description: '',
-        evidence_date: '',
-        evidence_job: '',
-    });
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
 
     // ambil data dari API
     const fetchEvidences = async () => {
@@ -83,7 +418,7 @@ function EvidenceDashboard() {
 
             const query = new URLSearchParams({
                 user: user_email,
-                month: String(selectedMonth + 1).padStart(2, '0'), // ✅ hanya kirim month
+                month: String(selectedMonth + 1).padStart(2, '0'),
                 find: searchTerm
             }).toString();
 
@@ -97,42 +432,18 @@ function EvidenceDashboard() {
                 description: item.evidence_description,
                 job: item.evidence_job,
                 status: item.evidence_status,
-                date: item.evidence_date
+                date: item.evidence_date,
+                content_id: item.content_id
             }));
 
             setEvidenceData(mapped);
-
-            // API udah balikin acceptedEvidences
             setAcceptedEvidenceTotal(Number(data.acceptedEvidences));
-
         } catch (err) {
             console.error(err);
             setEvidenceData([]);
             setAcceptedEvidenceTotal(0);
         } finally {
             setLoading(false);
-        }
-    };
-
-    // delete evidence
-    const confirmDelete = async (id: any) => {
-        setLoadingDelete(true);
-        try {
-            const res = await fetch(`/api/evidences/${id}`, {
-                method: "DELETE",
-            });
-
-            if (res.ok) {
-                setUserToDelete(null);
-                fetchEvidences(); // bisa dipanggil di sini
-                setConfirmOpen(false)
-            } else {
-                console.error("Gagal menghapus data");
-            }
-        } catch (error) {
-            console.error("Error saat menghapus:", error);
-        } finally {
-            setLoadingDelete(false);
         }
     };
 
@@ -160,50 +471,140 @@ function EvidenceDashboard() {
         }
     };
 
-    // jalankan saat pertama load & updated = true
+    // jalankan saat pertama load & updateTrigger bertambah
     useEffect(() => {
         fetchEvidences();
-        setUpdated(false);
-        if (updated) {
-            fetchEvidences();
-            setUpdated(false);
+        fetchContents();
+    }, [status, selectedMonth, selectedYear, searchTerm, updateTrigger]);
+
+    // delete evidence
+    const confirmDelete = async (id: any) => {
+        setLoadingDelete(true);
+        try {
+            const res = await fetch(`/api/evidences/${id}`, {
+                method: "DELETE",
+            });
+
+            if (res.ok) {
+                setUserToDelete(null);
+                fetchEvidences();
+                setConfirmOpen(false)
+            } else {
+                console.error("Gagal menghapus data");
+            }
+        } catch (error) {
+            console.error("Error saat menghapus:", error);
+        } finally {
+            setLoadingDelete(false);
         }
-    }, [status, selectedMonth, searchTerm, updated]);
+    };
 
-    // fetch contents saat modal dibuka
-    useEffect(() => {
-        if (modalOpen) {
-            fetchContents();
+    // Batch Upload Evidence CoC
+    const handleUploadEvidence = async (content: any, entries: any[], job: string): Promise<boolean> => {
+        try {
+            let successCount = 0;
+            
+            // Upload in sequence or parallel. Parallel might overload the connection or API, sequence is safer for compression.
+            for (const entry of entries) {
+                let fileToUpload = entry.file;
+                if (entry.file && entry.file.type.startsWith('image/')) {
+                    try {
+                        fileToUpload = await compressImage(entry.file);
+                    } catch (error) {
+                        console.error('Gagal kompresi:', error);
+                    }
+                }
+
+                const formPayload = new FormData();
+                formPayload.append('evidence_title', content.content_title);
+                formPayload.append('evidence_description', content.content_caption || '-');
+                formPayload.append('evidence_date', entry.date); // Gunakan tanggal dari entry!
+                formPayload.append('evidence_job', job);
+                formPayload.append('content_id', content.id);
+                if (fileToUpload) {
+                    formPayload.append('completion_proof', fileToUpload);
+                }
+
+                const response = await fetch('/api/evidences', { method: 'POST', body: formPayload });
+                if (response.ok) {
+                    successCount++;
+                }
+            }
+
+            if (successCount === entries.length) {
+                new Toast({ position: 'top-right', toastMsg: `${successCount} Evidence berhasil disimpan!`, type: 'success', theme: 'dark' });
+                fetchEvidences();
+                return true;
+            } else if (successCount > 0) {
+                new Toast({ position: 'top-right', toastMsg: `Sebagian evidence gagal. Berhasil: ${successCount}`, type: 'warning', theme: 'dark' });
+                fetchEvidences();
+                return true;
+            } else {
+                new Toast({ position: 'top-right', toastMsg: 'Gagal menyimpan evidence!', type: 'error', theme: 'dark' });
+                return false;
+            }
+        } catch (error) {
+            console.error(error);
+            new Toast({ position: 'top-right', toastMsg: 'Terjadi kesalahan sistem!', type: 'error', theme: 'dark' });
+            return false;
         }
-    }, [modalOpen]);
+    };
 
-    // helper: bikin grouping + sorting
-    const groupedContents = contents.reduce((acc: Record<string, any[]>, item: any) => {
-        const date = new Date(item.content_date);
-        const month = monthNames[date.getMonth()];
-        const year = date.getFullYear();
-        const group = `${month} ${year}`;
-        if (!acc[group]) acc[group] = [];
-        acc[group].push(item);
-        return acc;
-    }, {});
+    // Batch Upload Manual
+    const handleUploadManual = async (formData: any, entries: any[]): Promise<boolean> => {
+        try {
+            let successCount = 0;
+            
+            for (const entry of entries) {
+                let fileToUpload = entry.file;
+                if (entry.file && entry.file.type.startsWith('image/')) {
+                    try {
+                        fileToUpload = await compressImage(entry.file);
+                    } catch (error) {
+                        console.error('Gagal kompresi:', error);
+                    }
+                }
 
-    // urutin key by date terbaru → lama
-    const sortedGroups = Object.keys(groupedContents).sort((a, b) => {
-        const [monthA, yearA] = a.split(" ");
-        const [monthB, yearB] = b.split(" ");
-        const dateA = new Date(parseInt(yearA), monthNames.indexOf(monthA));
-        const dateB = new Date(parseInt(yearB), monthNames.indexOf(monthB));
-        return dateB.getTime() - dateA.getTime(); // desc
-    });
+                const formPayload = new FormData();
+                formPayload.append('evidence_title', formData.evidence_title);
+                formPayload.append('evidence_description', formData.evidence_description);
+                formPayload.append('evidence_date', entry.date); // Gunakan tanggal dari entry!
+                formPayload.append('evidence_job', formData.evidence_job);
+                formPayload.append('content_id', '');
+                if (fileToUpload) {
+                    formPayload.append('completion_proof', fileToUpload);
+                }
 
+                const response = await fetch('/api/evidences', { method: 'POST', body: formPayload });
+                if (response.ok) {
+                    successCount++;
+                }
+            }
 
-    // filter & sort hasil fetch (opsional, kalau mau filter lagi di frontend)
+            if (successCount === entries.length) {
+                new Toast({ position: 'top-right', toastMsg: `${successCount} Evidence berhasil disimpan!`, type: 'success', theme: 'dark' });
+                fetchEvidences();
+                return true;
+            } else if (successCount > 0) {
+                new Toast({ position: 'top-right', toastMsg: `Sebagian evidence gagal. Berhasil: ${successCount}`, type: 'warning', theme: 'dark' });
+                fetchEvidences();
+                return true;
+            } else {
+                new Toast({ position: 'top-right', toastMsg: 'Gagal menyimpan evidence!', type: 'error', theme: 'dark' });
+                return false;
+            }
+        } catch (error) {
+            console.error(error);
+            new Toast({ position: 'top-right', toastMsg: 'Terjadi kesalahan sistem!', type: 'error', theme: 'dark' });
+            return false;
+        }
+    };
+
     const statusOrder: Record<EvidenceStatus, number> = {
         needaction: 1,
         pending: 2,
         rejected: 3,
-        accepted: 4, // urutan terakhir
+        accepted: 4,
     };
 
     const filteredEvidence = evidenceData
@@ -212,12 +613,9 @@ function EvidenceDashboard() {
             const itemMonth = itemDate.getMonth();
             const itemYear = itemDate.getFullYear();
 
-            const statusMatch =
-                selectedStatus === 'Semua' || item.status === selectedStatus;
-
+            const statusMatch = selectedStatus === 'Semua' || item.status === selectedStatus;
             const monthMatch = itemMonth === selectedMonth;
-            const yearMatch =
-                selectedYear === null || itemYear === selectedYear;
+            const yearMatch = selectedYear === null || itemYear === selectedYear;
 
             return monthMatch && yearMatch && statusMatch;
         })
@@ -229,198 +627,14 @@ function EvidenceDashboard() {
                 : new Date(b.date).getTime() - new Date(a.date).getTime();
         });
 
-
-    // handle input change
-    const handleChange = (
-        e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-    ) => {
-        const { name, value } = e.target;
-        if (e.target instanceof HTMLInputElement && e.target.type === 'file') {
-            const files = e.target.files;
-            if (files && files[0]) {
-                setSelectedFile(files[0]);
-            }
-        } else {
-            setFormData({ ...formData, [name]: value });
-        }
-    };
-
-    // Fungsi kompresi gambar dengan target maksimal 300KB
-    const compressImage = async (file: File): Promise<File> => {
-        const MAX_FILE_SIZE = 300 * 1024; // 300KB dalam bytes
-
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = (event) => {
-                const img = new Image();
-                img.src = event.target?.result as string;
-                img.onload = async () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-
-                    if (!ctx) {
-                        reject(new Error('Gagal membuat canvas context'));
-                        return;
-                    }
-
-                    // Mulai dengan dimensi yang lebih kecil untuk hasil yang lebih baik
-                    let MAX_WIDTH = 1280;
-                    let MAX_HEIGHT = 1280;
-                    let width = img.width;
-                    let height = img.height;
-
-                    // Hitung ukuran baru dengan mempertahankan aspect ratio
-                    if (width > height) {
-                        if (width > MAX_WIDTH) {
-                            height = (height * MAX_WIDTH) / width;
-                            width = MAX_WIDTH;
-                        }
-                    } else {
-                        if (height > MAX_HEIGHT) {
-                            width = (width * MAX_HEIGHT) / height;
-                            height = MAX_HEIGHT;
-                        }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-
-                    // Gambar ulang image ke canvas dengan ukuran baru
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    // Fungsi untuk mengkompresi dengan quality tertentu
-                    const compressWithQuality = (quality: number): Promise<Blob | null> => {
-                        return new Promise((res) => {
-                            canvas.toBlob(
-                                (blob) => res(blob),
-                                'image/jpeg',
-                                quality
-                            );
-                        });
-                    };
-
-                    // Iterasi untuk mencari quality optimal agar ukuran <= 300KB
-                    let quality = 0.85;
-                    let blob: Blob | null = null;
-                    let attempts = 0;
-                    const maxAttempts = 10;
-
-                    while (attempts < maxAttempts) {
-                        blob = await compressWithQuality(quality);
-
-                        if (!blob) {
-                            break;
-                        }
-
-                        // Jika ukuran sudah di bawah target, selesai
-                        if (blob.size <= MAX_FILE_SIZE) {
-                            break;
-                        }
-
-                        // Kurangi quality untuk iterasi berikutnya
-                        quality -= 0.1;
-                        attempts++;
-
-                        // Jika quality sudah terlalu rendah, resize canvas lebih kecil
-                        if (quality < 0.4 && blob.size > MAX_FILE_SIZE) {
-                            width = Math.floor(width * 0.8);
-                            height = Math.floor(height * 0.8);
-                            canvas.width = width;
-                            canvas.height = height;
-                            ctx.drawImage(img, 0, 0, width, height);
-                            quality = 0.7; // Reset quality setelah resize
-                        }
-                    }
-
-                    if (blob) {
-                        // Buat file baru dari blob dengan nama yang sama
-                        const compressedFile = new File([blob], file.name, {
-                            type: 'image/jpeg',
-                            lastModified: Date.now(),
-                        });
-                        console.log(`Kompresi selesai: ${(blob.size / 1024).toFixed(2)} KB (quality: ${quality.toFixed(2)})`);
-                        resolve(compressedFile);
-                    } else {
-                        reject(new Error('Gagal kompresi gambar'));
-                    }
-                };
-                img.onerror = () => reject(new Error('Gagal memuat gambar'));
-            };
-            reader.onerror = () => reject(new Error('Gagal membaca file'));
-        });
-    };
-
-    // submit evidence
-    async function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        setLoadingSubmit(true);
-
-        try {
-            const isEmpty = Object.values(formData).some(
-                (val) => typeof val === 'string' && val.trim() === ''
-            );
-            if (!selectedFile || isEmpty) {
-                setModalOpen(false);
-                setSelectedFile(null);
-                new Toast({
-                    position: 'top-right',
-                    toastMsg: 'Semua field harus diisi!',
-                    autoCloseTime: 3000,
-                    showProgress: true,
-                    type: 'error',
-                    theme: 'dark',
-                });
-                return;
-            }
-
-            let fileToUpload = selectedFile;
-            if (selectedFile.type.startsWith('image/')) {
-                try {
-                    console.log('Ukuran asli:', (selectedFile.size / 1024).toFixed(2), 'KB');
-                    fileToUpload = await compressImage(selectedFile);
-                    console.log('Ukuran setelah kompresi:', (fileToUpload.size / 1024).toFixed(2), 'KB');
-                } catch (error) {
-                    console.error('Gagal kompresi, menggunakan file asli:', error);
-                }
-            }
-
-            const formPayload = new FormData();
-            formPayload.append('evidence_title', formData.evidence_title);
-            formPayload.append('evidence_description', formData.evidence_description);
-            formPayload.append('evidence_date', formData.evidence_date);
-            formPayload.append('evidence_job', formData.evidence_job);
-            formPayload.append('content_id', formData.content_id);
-            formPayload.append('completion_proof', fileToUpload);
-
-            const response = await fetch('/api/evidences', { method: 'POST', body: formPayload });
-
-            setModalOpen(false);
-            if (response.ok) {
-                setFormData({ evidence_title: '', content_id: '', evidence_description: '', evidence_date: '', evidence_job: '' });
-                setSelectedFile(null);
-                new Toast({
-                    position: 'top-right',
-                    toastMsg: 'Berhasil menyimpan!',
-                    autoCloseTime: 3000,
-                    type: 'success',
-                    theme: 'dark',
-                });
-                fetchEvidences();
-            } else {
-                setSelectedFile(null);
-                new Toast({
-                    position: 'top-right',
-                    toastMsg: 'Gagal menyimpan!',
-                    autoCloseTime: 3000,
-                    type: 'error',
-                    theme: 'dark',
-                });
-            }
-        } finally {
-            setLoadingSubmit(false);
-        }
-    }
+    // Check un-evidenced contents for checklist
+    const pendingContents = contents.filter((c) => {
+        const cDate = new Date(c.content_date);
+        if (cDate.getMonth() !== selectedMonth || cDate.getFullYear() !== selectedYear) return false;
+        // Cek apakah sudah ada di evidenceData
+        const hasEvidence = evidenceData.some((e) => e.content_id === c.id);
+        return !hasEvidence; // Tetap di-hide setelah upload pertama kali supaya tidak penuh. Jika butuh lebih banyak, mereka harus upload sekaligus (batch).
+    });
 
     return (
         <AuthGuard>
@@ -437,184 +651,49 @@ function EvidenceDashboard() {
                             <Menu size={28} className="text-white" />
                         </button>
                     </div>
-                    {/* Modals */}
-                    <ContentModal
-                        isOpen={modalOpen}
-                        onClose={() => {
-                            setSelectedFile(null); // Reset hanya file doang
-                            setModalOpen(false);   // Tutup modal
-                        }}
-                    >
-                        <h2 className="text-2xl font-semibold mb-6">Buat Evidence</h2>
-                        <form
-                            className="grid grid-cols-1 md:grid-cols-2 gap-5 text-sm"
-                            onSubmit={handleSubmit}
-                        >
-                            {/* Judul Konten */}
-                            <div className="">
-                                <label className="block text-white font-medium mb-1">Evidence</label>
-                                <input
-                                    name="evidence_title"
-                                    type="text"
-                                    value={formData.evidence_title}
-                                    onChange={handleChange}
-                                    placeholder="Masukkan judul evidence"
-                                    className="w-full rounded-lg border border-white/10 bg-white/5 text-white px-4 py-3 placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 transition"
-                                />
-                            </div>
-
-                            {/* Tanggal Konten */}
-                            <div>
-                                <label className="block text-white font-medium mb-1">Tanggal</label>
-                                <input
-                                    name="evidence_date"
-                                    type="date"
-                                    value={formData.evidence_date}
-                                    onChange={handleChange}
-                                    className="w-full rounded-lg border border-white/10 bg-white/5 text-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-white/20 transition"
-                                />
-                            </div>
-
-                            {/* Caption */}
-                            <div className="md:col-span-2">
-                                <label className="block text-white font-medium mb-1">Keterangan</label>
-                                <textarea
-                                    name="evidence_description"
-                                    value={formData.evidence_description}
-                                    onChange={handleChange}
-                                    placeholder="Masukkan caption konten..."
-                                    className="w-full rounded-lg border border-white/10 bg-white/5 text-white px-4 py-3 h-28 placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 transition resize-none"
-                                />
-                            </div>
-                            {/* Tanggal Konten */}
-                            <div className="md:col-span-2">
-                                <label className="block text-white font-medium mb-2">Bukti</label>
-
-                                <div
-                                    className={`relative flex items-center justify-between w-full rounded-lg border px-4 py-3 cursor-pointer transition group
-        ${selectedFile
-                                            ? "border-white/10 bg-white/5 hover:bg-white/10"
-                                            : "border-white/20 bg-white/10 hover:bg-white/15"
-                                        }`}
-                                >
-                                    {selectedFile ? (
-                                        <span className="truncate text-white/70 group-hover:text-white">
-                                            {selectedFile.name}
-                                        </span>
-                                    ) : (
-                                        <span className="truncate text-white/60 group-hover:text-white/80">
-                                            Klik untuk memilih file...
-                                        </span>
-                                    )}
-
-                                    <UploadCloud
-                                        className={`w-5 h-5 transition
-            ${selectedFile
-                                                ? "text-white/50 group-hover:text-white"
-                                                : "text-white/60 group-hover:text-white/80"
-                                            }`}
-                                    />
-                                    <input
-                                        type="file"
-                                        name="completion_proof"
-                                        accept="image/*,.pdf"
-                                        onChange={handleChange}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                    />
-                                </div>
-
-                            </div>
-
-                            {/* Feedback */}
-                            <div className=''>
-                                <label className="block text-white font-medium mb-1">Calendar Of Content</label>
-                                <select
-                                    name="content_id"
-                                    value={formData.content_id}
-                                    onChange={handleChange}
-                                    className="w-full rounded-lg border border-white/10 bg-white/5 text-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-white/20 transition"
-                                >
-                                    <option className="bg-black text-white" disabled value="">
-                                        {loadingContents ? "Memuat konten..." : "Pilih CoC"}
-                                    </option>
-                                    {sortedGroups.map((monthYear) => (
-                                        <optgroup className="bg-black text-white" key={monthYear} label={monthYear}>
-                                            {groupedContents[monthYear].map((item) => (
-                                                <option
-                                                    key={item.id}
-                                                    value={item.id}
-                                                    className="bg-black text-white"
-                                                >
-                                                    {item.content_title}
-                                                </option>
-                                            ))}
-                                            <option className="bg-black text-white" value="other">
-                                                Lainnya
-                                            </option>
-                                        </optgroup>
-                                    ))}
-                                </select>
-                            </div>
-
-                            {/* Feedback */}
-                            <div>
-                                <label className="block text-white font-medium mb-1">Tugas</label>
-                                <select
-                                    name="evidence_job"
-                                    value={formData.evidence_job}
-                                    onChange={handleChange}
-                                    className="w-full rounded-lg border border-white/10 bg-white/5 text-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-white/20 transition"
-                                >
-                                    <option className="bg-black text-white" value="" disabled>Pilih tugas</option>
-                                    <option className="bg-black text-white" value="Edit/Design Konten">Edit/Design Konten (Feed, Story, WhatsApp)</option>
-                                    <option className="bg-black text-white" value="Take Video">Take Video (Video, Reels, TikTok)</option>
-                                    <option className="bg-black text-white" value="Content Production">Content Production (Ide, Skrip atau Caption)</option>
-                                    <option className="bg-black text-white" value="Pemotretan, Dokumentasi">Pemotretan / Dokumentasi</option>
-                                    <option className="bg-black text-white" value="Sosialisasi">(BA) Sosialisasi</option>
-                                    <option className="bg-black text-white" value="Lainnya">Lainnya</option>
-                                </select>
-                            </div>
-
-                            {/* Tombol Aksi */}
-                            <div className="md:col-span-2 flex justify-end gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setModalOpen(false)}
-                                    className="px-5 py-2.5 rounded-lg text-sm font-medium bg-white/10 text-white hover:bg-white/20 transition"
-                                >
-                                    Batal
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={loadingSubmit}
-                                    className="px-5 py-2.5 rounded-lg text-sm font-medium bg-white/20 hover:bg-white/30 transition text-white flex items-center gap-2"
-                                >
-                                    {loadingSubmit ? (
-                                        <>
-                                            <Loader2 size={16} className="animate-spin" /> Menyimpan...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Save size={16} /> Simpan
-                                        </>
-                                    )}
-                                </button>
-
-                            </div>
-                        </form>
-                    </ContentModal>
 
                     <main className="flex-1 p-5 md:p-10 overflow-y-auto">
                         {/* Heading */}
                         <div className="mb-6">
-                            <h1 className="text-4xl font-extrabold mb-2">Point Evidence</h1>
-                            <p className="text-white/50 text-lg">Lihat atau tambahkan point evidence kamu</p>
+                            <h1 className="text-4xl font-extrabold mb-2 tracking-tight">Point Evidence</h1>
+                            <p className="text-white/50 text-lg">Kelola dan kumpulkan bukti pekerjaan harianmu.</p>
                         </div>
 
                         {/* Main content wrapper */}
-                        <div className="flex flex-col md:flex-row w-full gap-y-6 md:gap-x-6">
+                        <div className="flex flex-col md:flex-row w-full gap-y-6 md:gap-x-8">
                             {/* Left section - Search & List */}
                             <div className="w-full md:flex-1">
+                                
+                                {/* Quick Add Checklist Section */}
+                                <div className="mb-8">
+                                    <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                                        <CheckCircle2 size={20} className="text-green-400" /> Checklist Calendar of Content
+                                    </h2>
+                                    {loadingContents || loading ? (
+                                        <div className="text-sm text-white/40 py-6 text-center border border-white/10 rounded-xl bg-white/5">
+                                            Memuat checklist...
+                                        </div>
+                                    ) : pendingContents.length > 0 ? (
+                                        <div className="space-y-4">
+                                            {pendingContents.map(content => (
+                                                <QuickAddRow key={content.id} content={content} onUpload={handleUploadEvidence} />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-white/50 py-6 text-center border border-white/10 rounded-xl bg-white/5 italic">
+                                            Semua Calendar of Content bulan ini sudah dilengkapi evidence! 🎉
+                                        </div>
+                                    )}
+                                </div>
+
+                                <QuickAddManualForm onUploadManual={handleUploadManual} />
+
+                                {/* Divider */}
+                                <div className="h-px bg-white/10 w-full mb-6 mt-2"></div>
+                                <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                                    <FileIcon size={20} className="text-white/80" /> Daftar Evidence
+                                </h2>
+
                                 {/* Search bar */}
                                 <div className="relative w-full mb-4">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={18} />
@@ -622,8 +701,8 @@ function EvidenceDashboard() {
                                         type="text"
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
-                                        placeholder="Cari evidence..."
-                                        className="w-full pl-10 pr-3 py-2 text-sm rounded-lg bg-[#1f1f1f] border border-white/10 text-white focus:outline-none focus:border-white/20"
+                                        placeholder="Cari evidence yang sudah terunggah..."
+                                        className="w-full pl-10 pr-3 py-3 text-sm rounded-xl bg-[#1f1f1f] border border-white/10 text-white focus:outline-none focus:border-white/20 transition-all shadow-inner"
                                     />
                                 </div>
 
@@ -633,7 +712,7 @@ function EvidenceDashboard() {
                                             <div className="relative w-8 h-8 mx-auto">
                                                 <div className="absolute inset-0 border-[3px] border-white border-t-transparent rounded-full animate-spin"></div>
                                             </div>
-                                            <p className="text-sm font-medium text-white/70 animate-pulse mt-2">Memuat konten...</p>
+                                            <p className="text-sm font-medium text-white/70 animate-pulse mt-3">Memuat data evidence...</p>
                                         </div>
                                     </div>
                                 ) : (
@@ -641,10 +720,10 @@ function EvidenceDashboard() {
                                         {/* Evidence list */}
                                         {filteredEvidence.length === 0 ? (
                                             <div className="text-sm text-white/40 italic py-10 text-center border border-white/10 rounded-xl bg-[#1f1f1f]">
-                                                Tidak ada evidence di bulan ini.
+                                                Belum ada evidence di bulan ini.
                                             </div>
                                         ) : (
-                                            <div className="space-y-5">
+                                            <div className="space-y-4">
                                                 {filteredEvidence.map((item) => {
                                                     const statusClasses =
                                                         item.status === "accepted"
@@ -756,16 +835,7 @@ function EvidenceDashboard() {
                             </div>
 
                             {/* Right section */}
-                            <div className="w-full md:w-64 md:sticky md:top-10 space-y-5">
-
-                                {/* Tombol Buat Evidence */}
-                                <button
-                                    onClick={() => setModalOpen(true)}
-                                    className="flex items-center justify-center gap-2 bg-white text-[#0a0a0a] px-4 py-2 rounded-lg font-semibold hover:bg-gray-200 text-sm w-full transition shadow-sm"
-                                >
-                                    <Plus size={18} /> Buat Evidence
-                                </button>
-
+                            <div className="w-full md:w-64 md:sticky md:top-10 space-y-6">
                                 {/* Statistik Evidence */}
                                 <div className="bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl p-6">
                                     <div className="flex items-center justify-between mb-3">
@@ -779,7 +849,7 @@ function EvidenceDashboard() {
                                         className={`flex items-end justify-center transition-filter duration-500 ease-in-out ${loading ? "filter blur-sm opacity-70" : "filter-none opacity-100"
                                             }`}
                                     >
-                                        <p className="text-[2.5rem] font-bold text-white leading-none">
+                                        <p className="text-[3rem] font-black text-white leading-none tracking-tight">
                                             {acceptedEvidenceTotal}
                                         </p>
                                     </div>
@@ -790,18 +860,14 @@ function EvidenceDashboard() {
                                 <div className="mb-4">
                                     <select
                                         value={selectedYear}
-                                        onChange={(e) => {
-                                            const newYear = Number(e.target.value);
-                                            console.log("Tahun dipilih:", newYear); // debug pas pilih tahun
-                                            setSelectedYear(newYear);
-                                        }}
-                                        className="w-full rounded-lg border border-white/10 bg-white/5 text-white px-4 py-2 focus:outline-none focus:ring-2 focus:ring-white/20 transition"
+                                        onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                        className="w-full rounded-xl border border-white/10 bg-white/5 text-white px-4 py-3 font-medium focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
                                     >
                                         {Array.from({ length: 5 }, (_, i) => {
                                             const year = new Date().getFullYear() - 2 + i;
                                             return (
                                                 <option key={year} value={year} className="bg-black text-white">
-                                                    {year}
+                                                    Tahun {year}
                                                 </option>
                                             );
                                         })}
@@ -813,7 +879,7 @@ function EvidenceDashboard() {
                                 <div className="bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl p-5">
                                     <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
                                         <CalendarDays size={16} className="text-white/80" />
-                                        Filter Bulan ({selectedYear})
+                                        Filter Bulan
                                     </h2>
                                     <div className="grid grid-cols-2 gap-2">
                                         {monthNames.map((month, i) => {
@@ -822,10 +888,10 @@ function EvidenceDashboard() {
                                                 <button
                                                     key={i}
                                                     onClick={() => setSelectedMonth(i)}
-                                                    className={`w-full rounded-lg px-4 py-2 text-sm font-medium text-left transition-all duration-200 border
+                                                    className={`w-full rounded-lg px-4 py-2.5 text-sm font-medium text-center transition-all duration-300 border
                             ${isSelected
-                                                            ? 'bg-white/10 border-white/20 text-white shadow-md ring-1 ring-white/20'
-                                                            : 'bg-[#121212] border-white/10 text-white/60 hover:bg-white/5 hover:text-white'}
+                                                            ? 'bg-white/10 border-white/20 text-white shadow-lg ring-1 ring-white/20'
+                                                            : 'bg-black/20 border-white/5 text-white/50 hover:bg-white/5 hover:text-white'}
                         `}
                                                 >
                                                     {month}

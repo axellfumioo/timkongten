@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { Check, X, Search, Image as ImageIcon, DownloadCloud } from 'lucide-react'
-import { supabase } from '@/app/lib/supabase'
 import { useGlobalStore } from '@/app/lib/global-store'
 import EvidenceModal from '../layout/journal/contentModal/EvidenceModal'
 
@@ -39,8 +38,7 @@ export default function EvidenceTable() {
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [loadingAction, setLoadingAction] = useState<'accepted' | 'declined' | null>(null)
 
-  const updated = useGlobalStore((state) => state.updated)
-  const setUpdated = useGlobalStore((state) => state.setUpdated)
+  const updateTrigger = useGlobalStore((state) => state.updateTrigger)
 
   // ✅ state users bener
   const [users, setUsers] = useState<User[]>([])
@@ -49,36 +47,30 @@ export default function EvidenceTable() {
   const [endDate, setEndDate] = useState("")
   const [isUserRecap, setIsUserRecap] = useState(false)
 
-  // fetch evidence
   const fetchEvidences = async () => {
     setIsLoading(true)
-    const { data, error } = await supabase
-      .from("evidence")
-      .select(`
-        *,
-        users:user_email (
-          email,
-          name,
-          role
-        )
-      `)
-      .eq("evidence_status", "pending")
-      .order("evidence_date", { ascending: false })
-
-    if (error) {
-      console.error("Error fetching evidences:", error)
+    try {
+      const res = await fetch('/api/admin/evidences');
+      const data = await res.json();
+      
+      if (!res.ok) {
+        console.error("Error fetching evidences:", data.error);
+        setIsLoading(false);
+        return;
+      }
+      
+      setEvidences(data || [])
+      setFiltered(data || [])
+    } catch (error) {
+      console.error("Fetch error:", error)
+    } finally {
       setIsLoading(false)
-      return
     }
-
-    setEvidences((data as Evidence[]) || [])
-    setFiltered((data as Evidence[]) || [])
-    setIsLoading(false)
   }
 
   useEffect(() => {
     fetchEvidences()
-  }, [updated])
+  }, [updateTrigger])
 
   // filter search
   useEffect(() => {
@@ -96,15 +88,16 @@ export default function EvidenceTable() {
   // fetch users
   useEffect(() => {
     const fetchUsers = async () => {
-      const { data, error } = await supabase
-        .from("users")
-        .select("id, email, name")
-        .order("id", { ascending: true })
-
-      if (error) {
-        console.error("Error fetching users:", error)
-      } else {
-        setUsers(data as User[])
+      try {
+        const res = await fetch('/api/admin/users');
+        const data = await res.json();
+        if (res.ok) {
+          setUsers(data as User[]);
+        } else {
+          console.error("Error fetching users:", data.error);
+        }
+      } catch (error) {
+        console.error("Fetch users error:", error);
       }
     }
 

@@ -1,12 +1,12 @@
 // app/api/download/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/app/lib/supabase";
 import ExcelJS from "exceljs";
+import { query } from "@/app/lib/postgres";
 
 type EvidenceRow = {
-  id: number;
+  id: string;
   user_email: string;
-  content_id: number | null;
+  content_id: string | null;
   evidence_title: string | null;
   evidence_description: string | null;
   evidence_date: string;
@@ -14,7 +14,8 @@ type EvidenceRow = {
   completion_proof: string | null;
   created_at: string;
   evidence_job: string | null;
-  users: { name: string } | null; // ⬅️ BUKAN ARRAY
+  user_name: string | null;
+  content_title: string | null;
 };
 
 export async function GET(req: NextRequest) {
@@ -33,42 +34,12 @@ export async function GET(req: NextRequest) {
     // ============================
     // Ambil semua data evidence + join user name
     // ============================
-    const { data, error } = (await supabase
-      .from("evidence")
-      .select(
-        `
-    id,
-    user_email,
-    content_id,
-    evidence_title,
-    evidence_description,
-    evidence_date,
-    evidence_status,
-    completion_proof,
-    created_at,
-    evidence_job,
-    users:user_email (
-      name
-    ),
-    content:content_id (
-      content_title
-    )
-  `
-      )
-      .gte("evidence_date", start_date)
-      .lte("evidence_date", end_date)
-      .order("evidence_date", { ascending: true })) as unknown as {
-      data: (EvidenceRow & { content: { content_title: string } | null })[];
-      error: any;
-    };
+    const result = await query<EvidenceRow>(
+      "SELECT e.id, e.user_email, e.content_id, e.evidence_title, e.evidence_description, e.evidence_date, e.evidence_status, e.completion_proof, e.created_at, e.evidence_job, u.name AS user_name, c.content_title AS content_title FROM evidence e LEFT JOIN users u ON u.email = e.user_email LEFT JOIN content c ON c.id = e.content_id WHERE e.evidence_date >= $1 AND e.evidence_date <= $2 ORDER BY e.evidence_date ASC",
+      [start_date, end_date]
+    );
 
-    if (error) {
-      console.error(error);
-      return NextResponse.json(
-        { error: "Failed to fetch data from Supabase" },
-        { status: 500 }
-      );
-    }
+    const data = result.rows;
 
     if (!data || data.length === 0) {
       return NextResponse.json({ error: "No data found" }, { status: 404 });
@@ -105,7 +76,7 @@ export async function GET(req: NextRequest) {
       {};
 
     data.forEach((row) => {
-      const userName = row.users?.name ?? row.user_email ?? "Unknown User";
+      const userName = row.user_name ?? row.user_email ?? "Unknown User";
       if (!groupedByUser[userName]) {
         groupedByUser[userName] = { total: 0, accepted: 0 };
       }
@@ -147,8 +118,8 @@ export async function GET(req: NextRequest) {
     data.forEach((row) => {
       const newRow = worksheet.addRow([
         row.id,
-        row.users?.name ?? row.user_email ?? "Unknown User",
-        row.content?.content_title ?? "", // ✅ content title
+        row.user_name ?? row.user_email ?? "Unknown User",
+        row.content_title ?? "",
         row.evidence_title ?? "",
         row.evidence_description ?? "",
         formatDate(row.evidence_date),

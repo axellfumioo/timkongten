@@ -1,9 +1,11 @@
-import { supabase } from "@/app/lib/supabase";
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { logActivity } from "@/app/lib/logActivity";
 import { authOptions } from "@/app/lib/authOptions";
 import { cacheHelper } from "@/lib/redis";
+import { query } from "@/app/lib/postgres";
 
 /**
  * GET content by ID
@@ -20,15 +22,14 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Query langsung dari Supabase
-  const { data, error } = await supabase
-    .from("content")
-    .select("*")
-    .eq("id", id)
-    .single();
+  // Query langsung dari database
+  const result = await query("SELECT * FROM content WHERE id = $1 LIMIT 1", [
+    id,
+  ]);
+  const data = result.rows[0];
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 404 });
+  if (!data) {
+    return NextResponse.json({ error: "Content not found" }, { status: 404 });
   }
 
   return NextResponse.json(data);
@@ -50,13 +51,15 @@ export async function DELETE(
   }
 
   // Ambil dulu content_title dan content_date sebelum delete
-  const { data: contentData, error: fetchError } = await supabase
-    .from("content")
-    .select("content_title, content_date")
-    .eq("id", id)
-    .single();
+  const contentResult = await query<{
+    content_title: string;
+    content_date: string;
+  }>("SELECT content_title, content_date FROM content WHERE id = $1 LIMIT 1", [
+    id,
+  ]);
 
-  if (fetchError || !contentData) {
+  const contentData = contentResult.rows[0];
+  if (!contentData) {
     return NextResponse.json(
       { error: "Content not found before deletion" },
       { status: 404 }
@@ -64,13 +67,9 @@ export async function DELETE(
   }
 
   // Delete content
-  const { error: deleteError } = await supabase
-    .from("content")
-    .delete()
-    .eq("id", id);
-
-  if (deleteError) {
-    return NextResponse.json({ error: deleteError.message }, { status: 500 });
+  const deleteResult = await query("DELETE FROM content WHERE id = $1", [id]);
+  if (deleteResult.rowCount === 0) {
+    return NextResponse.json({ error: "Content not found" }, { status: 404 });
   }
 
   // Invalidate cache
@@ -123,21 +122,21 @@ export async function PUT(
   }
 
   try {
-    const { data, error } = await supabase
-      .from("content")
-      .update({
+    const result = await query(
+      "UPDATE content SET content_category = $1, content_type = $2, content_title = $3, content_caption = $4, content_feedback = $5, content_date = $6 WHERE id = $7 RETURNING *",
+      [
         content_category,
         content_type,
         content_title,
         content_caption,
         content_feedback,
         content_date,
-      })
-      .eq("id", id)
-      .select();
+        id,
+      ]
+    );
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (result.rowCount === 0) {
+      return NextResponse.json({ error: "Content not found" }, { status: 404 });
     }
 
     // Invalidate cache
@@ -152,7 +151,7 @@ export async function PUT(
       activity_message: `Updated content titled "${content_title}"`,
     });
 
-    return NextResponse.json(data);
+    return NextResponse.json(result.rows);
   } catch (err) {
     console.error("PUT content error:", err);
     return NextResponse.json(

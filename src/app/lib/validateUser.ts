@@ -1,16 +1,10 @@
-import { createClient } from "@supabase/supabase-js";
-import { supabase } from "./supabase";
+import { query } from "./postgres";
 
-export async function validateUser(email: string): Promise<boolean> {  
-  const { data, error } = await supabase
-    .from("users")
-    .select("id")
-    .eq("email", email)
-    .single();
+export async function validateUser(email: string): Promise<boolean> {
+  const result = await query<{ id: string }>(
+    "SELECT id FROM users WHERE email = $1 LIMIT 1",
+    [email]
+  );
 
-  if (error || !data) {
-    return false;
-  }
-
-  return true; // Email ditemukan
+  return result.rowCount > 0;
 }

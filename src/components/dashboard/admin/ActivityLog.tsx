@@ -24,17 +24,15 @@ export default function ActivityLog() {
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
 
-  const updated = useGlobalStore((state) => state.updated)
-  const setUpdated = useGlobalStore((state) => state.setUpdated)
+  const updateTrigger = useGlobalStore((state) => state.updateTrigger)
 
   useEffect(() => {
     const fetchUsers = async () => {
       setIsLoading(true)
-      setUpdated(false)
     }
 
     fetchUsers()
-  }, [updated])
+  }, [updateTrigger])
 
   return (
     <AuthGuard>

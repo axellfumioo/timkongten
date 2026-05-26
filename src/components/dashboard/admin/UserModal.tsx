@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/app/lib/supabase'
+
 import { useGlobalStore } from '@/app/lib/global-store'
 import { X } from 'lucide-react'
 import Toast from 'typescript-toastify'
@@ -10,7 +10,7 @@ export default function UserModal({ isOpen, onClose, selectedUser }: any) {
     const [name, setName] = useState('')
     const [email, setEmail] = useState('')
     const [role, setRole] = useState('')
-    const setUpdated = useGlobalStore((state) => state.setUpdated)
+    const triggerUpdate = useGlobalStore((state) => state.triggerUpdate)
 
     useEffect(() => {
         if (isOpen) {
@@ -47,9 +47,17 @@ export default function UserModal({ isOpen, onClose, selectedUser }: any) {
         let res;
 
         if (selectedUser) {
-            res = await supabase.from('users').update(dataToSave).eq('id', selectedUser.id);
+            res = await fetch(`/api/admin/users/${selectedUser.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dataToSave)
+            });
         } else {
-            res = await supabase.from('users').insert([dataToSave]);
+            res = await fetch('/api/admin/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dataToSave)
+            });
         }
 
         if (!email.endsWith('@student.smktelkom-pwt.sch.id')) {
@@ -64,14 +72,14 @@ export default function UserModal({ isOpen, onClose, selectedUser }: any) {
             return;
         }
 
-
-        if (res.error) {
-            console.error("❌ Supabase Error:", res.error.message);
-            alert("Gagal menyimpan data: " + res.error.message);
+        if (!res.ok) {
+            const data = await res.json();
+            console.error("❌ API Error:", data.error);
+            alert("Gagal menyimpan data: " + data.error);
             return;
         }
 
-        setUpdated(true);
+        triggerUpdate();
         onClose();
     };
 

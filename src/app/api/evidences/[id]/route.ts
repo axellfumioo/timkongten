@@ -1,4 +1,5 @@
-import { supabase } from "@/app/lib/supabase";
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { logActivity } from "@/app/lib/logActivity";
@@ -6,6 +7,7 @@ import { authOptions } from "@/app/lib/authOptions";
 import { randomUUID } from "crypto";
 import { uploadToB2 } from "@/app/lib/uploadToB2";
 import { cacheHelper } from "@/lib/redis";
+import { query } from "@/app/lib/postgres";
 
 // Helper ambil bulan format MM dari tanggal yyyy-mm-dd
 function getMonthFromDate(dateString: string) {
@@ -28,13 +30,12 @@ export async function GET(
   if (!user?.email)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data, error } = await supabase
-    .from("evidence")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const result = await query("SELECT * FROM evidence WHERE id = $1 LIMIT 1", [
+    id,
+  ]);
+  const data = result.rows[0];
 
-  if (error || !data)
+  if (!data)
     return NextResponse.json({ error: "Evidence not found" }, { status: 404 });
 
   // Log activity async
@@ -67,17 +68,16 @@ export async function PUT(
   const evidence_title = formData.get("evidence_title") as string;
   const completion_proof = formData.get("completion_proof") as File | null;
 
-  const { data: oldData, error: fetchErr } = await supabase
-    .from("evidence")
-    .select("evidence_date, completion_proof")
-    .eq("id", id)
-    .single();
+  const oldResult = await query<{
+    evidence_date: string;
+    completion_proof: string | null;
+  }>("SELECT evidence_date, completion_proof FROM evidence WHERE id = $1 LIMIT 1", [
+    id,
+  ]);
 
-  if (fetchErr || !oldData)
-    return NextResponse.json(
-      { error: fetchErr?.message || "Not found" },
-      { status: 404 }
-    );
+  const oldData = oldResult.rows[0];
+  if (!oldData)
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   let fileUrl = oldData.completion_proof || null;
 
@@ -96,13 +96,13 @@ export async function PUT(
       );
   }
 
-  const { error } = await supabase
-    .from("evidence")
-    .update({ evidence_title, completion_proof: fileUrl })
-    .eq("id", id);
+  const updateResult = await query(
+    "UPDATE evidence SET evidence_title = $1, completion_proof = $2 WHERE id = $3",
+    [evidence_title, fileUrl, id]
+  );
 
-  if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (updateResult.rowCount === 0)
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // Invalidate cache
   await cacheHelper.invalidatePattern('evidence:*');
@@ -133,16 +133,20 @@ export async function DELETE(
   if (!user?.email)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: evidenceData, error: getError } = await supabase
-    .from("evidence")
-    .select("user_email,evidence_title,evidence_date")
-    .eq("id", id)
-    .single();
+  const evidenceResult = await query<{
+    user_email: string;
+    evidence_title: string;
+    evidence_date: string;
+  }>(
+    "SELECT user_email, evidence_title, evidence_date FROM evidence WHERE id = $1 LIMIT 1",
+    [id]
+  );
 
-  const { error } = await supabase.from("evidence").delete().eq("id", id);
+  const evidenceData = evidenceResult.rows[0];
+  const deleteResult = await query("DELETE FROM evidence WHERE id = $1", [id]);
 
-  if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (deleteResult.rowCount === 0)
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // Invalidate cache
   await cacheHelper.invalidatePattern('evidence:*');
@@ -179,25 +183,26 @@ export async function PATCH(
   if (!["accepted", "declined"].includes(status))
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
 
-  const { data: evidenceData, error: fetchErr } = await supabase
-    .from("evidence")
-    .select("user_email, evidence_title, evidence_date")
-    .eq("id", id)
-    .single();
+  const evidenceResult = await query<{
+    user_email: string;
+    evidence_title: string;
+    evidence_date: string;
+  }>(
+    "SELECT user_email, evidence_title, evidence_date FROM evidence WHERE id = $1 LIMIT 1",
+    [id]
+  );
 
-  if (fetchErr || !evidenceData)
-    return NextResponse.json(
-      { error: fetchErr?.message || "Not found" },
-      { status: 404 }
-    );
+  const evidenceData = evidenceResult.rows[0];
+  if (!evidenceData)
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { error } = await supabase
-    .from("evidence")
-    .update({ evidence_status: status })
-    .eq("id", id);
+  const updateResult = await query(
+    "UPDATE evidence SET evidence_status = $1 WHERE id = $2",
+    [status, id]
+  );
 
-  if (error)
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (updateResult.rowCount === 0)
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   // Invalidate cache
   await cacheHelper.invalidatePattern('evidence:*');

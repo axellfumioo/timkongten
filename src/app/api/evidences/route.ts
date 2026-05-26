@@ -1,4 +1,5 @@
-import { supabase } from "@/app/lib/supabase";
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from "next/server";
 import { uploadToB2 } from "@/app/lib/uploadToB2";
 import { randomUUID } from "crypto";
@@ -6,6 +7,7 @@ import { getServerSession } from "next-auth";
 import { logActivity } from "@/app/lib/logActivity";
 import { authOptions } from "@/app/lib/authOptions";
 import { cacheHelper } from "@/lib/redis";
+import { query } from "@/app/lib/postgres";
 
 export async function GET(req: Request) {
   const totalStart = Date.now();
@@ -24,7 +26,7 @@ export async function GET(req: Request) {
   const currentMonth = String(new Date().getMonth() + 1).padStart(2, "0");
   const evidenceMonth = monthParam ? monthParam.padStart(2, "0") : currentMonth;
 
-  // ===== Supabase Query =====
+  // ===== DB Query =====
   const monthStart = `${new Date().getFullYear()}-${evidenceMonth}-01`;
   const monthEndDate = new Date(
     new Date(monthStart).getFullYear(),
@@ -41,17 +43,23 @@ export async function GET(req: Request) {
     const data = await cacheHelper.getOrSet(
       cacheKey,
       async () => {
-        const { data, error } = await supabase.rpc("get_evidences", {
-          target_email: user ?? null,
-          start_date: monthStart,
-          end_date: monthEnd,
+        let sql = "SELECT *, TO_CHAR(evidence_date, 'YYYY-MM-DD') AS formatted_date FROM evidence WHERE evidence_date >= $2 AND evidence_date <= $3";
+        const params: any[] = [user ?? null, monthStart, monthEnd];
+        if (user) {
+            sql += " AND user_email = $1";
+        } else {
+            sql += " AND ($1::text IS NULL)";
+        }
+        sql += " ORDER BY created_at DESC";
+        const result = await query(sql, params);
+
+        const rows = (result.rows || []).map((row: any) => {
+          row.evidence_date = row.formatted_date;
+          delete row.formatted_date;
+          return row;
         });
 
-        if (error) {
-          throw new Error(error.message);
-        }
-
-        return data || [];
+        return rows;
       },
       300 // Cache 5 menit
     );
@@ -63,7 +71,7 @@ export async function GET(req: Request) {
     ).length;
 
     const profiling = {
-      supabase: `${dbTime}ms`,
+      database: `${dbTime}ms`,
       total: `${Date.now() - totalStart}ms`,
     };
 
@@ -74,7 +82,7 @@ export async function GET(req: Request) {
       {
         status: 200,
         headers: {
-          "X-Supabase-Query": `${dbTime}ms`,
+          "X-DB-Query": `${dbTime}ms`,
           "X-Total-Time": `${Date.now() - totalStart}ms`,
         },
       }
@@ -123,21 +131,25 @@ export async function POST(req: Request) {
       );
     }
 
-    const payload = {
-      user_email,
-      evidence_title,
-      evidence_description,
-      evidence_date,
-      evidence_job,
-      content_id,
-      completion_proof: fileUrl,
-      evidence_status: "pending",
-    };
+    const contentIdValue =
+      content_id && content_id !== "null" ? content_id : null;
 
-    // ===== Supabase Insert =====
+    // ===== DB Insert =====
     const insertStart = Date.now();
     const [insertResult] = await Promise.all([
-      supabase.from("evidence").insert([payload]),
+      query(
+        "INSERT INTO evidence (user_email, evidence_title, evidence_description, evidence_date, evidence_job, content_id, completion_proof, evidence_status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id",
+        [
+          user_email,
+          evidence_title,
+          evidence_description,
+          evidence_date,
+          evidence_job,
+          contentIdValue,
+          fileUrl,
+          "pending",
+        ]
+      ),
       logActivity({
         user_name: user.name,
         user_email,
@@ -148,24 +160,21 @@ export async function POST(req: Request) {
     ]);
     const insertTime = Date.now() - insertStart;
 
-    if (insertResult.error) {
-      console.error("Supabase insert error:", insertResult.error);
-      return NextResponse.json(
-        { error: insertResult.error.message || "Insert gagal" },
-        { status: 500 }
-      );
+    if (insertResult.rowCount === 0) {
+      return NextResponse.json({ error: "Insert gagal" }, { status: 500 });
     }
 
     const profiling = {
       upload_b2: `${uploadTime}ms`,
-      insert_supabase: `${insertTime}ms`,
+      insert_db: `${insertTime}ms`,
       total: `${Date.now() - totalStart}ms`,
     };
 
     console.log("[POST /evidences]", profiling);
 
     // Invalidate cache setelah insert
-    await cacheHelper.invalidatePattern('evidence:*');
+    await cacheHelper.invalidatePattern(`evidence:${user_email}:*`);
+    await cacheHelper.invalidatePattern('evidence:all:*');
     await cacheHelper.invalidate('stats');
 
     return NextResponse.json(
@@ -174,7 +183,7 @@ export async function POST(req: Request) {
         status: 201,
         headers: {
           "X-Upload-R2": `${uploadTime}ms`,
-          "X-Supabase-Insert": `${insertTime}ms`,
+          "X-DB-Insert": `${insertTime}ms`,
           "X-Total-Time": `${Date.now() - totalStart}ms`,
         },
       }

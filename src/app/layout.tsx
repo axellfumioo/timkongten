@@ -41,7 +41,7 @@ export default function RootLayout({
     setFormData({ ...formData, [e.target.name]: e.target.value });
   }
 
-  const setUpdated = useGlobalStore((state) => state.setUpdated);
+  const triggerUpdate = useGlobalStore((state) => state.triggerUpdate);
   const isCocOpen = useGlobalStore((state) => state.cocOpen);
   const setCocOpen = useGlobalStore((state) => state.setCocOpen);
   const [modalOpen, setModalOpen] = useState(false);
@@ -98,7 +98,7 @@ export default function RootLayout({
         type: "success",
         theme: "dark"
       });
-      setUpdated(true);
+      triggerUpdate();
       setCocOpen(false);
     } else {
       setCocOpen(false);

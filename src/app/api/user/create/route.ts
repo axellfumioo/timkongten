@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/app/lib/supabase";
+import { query } from "@/app/lib/postgres";
 
 export async function POST(req: Request) {
   try {
@@ -19,23 +19,26 @@ export async function POST(req: Request) {
       role: body.role,
     };
 
-    const { data, error } = await supabase
-      .from("users")
-      .insert([newUser]);
-
-    if (error) {
-      if (error.code === "23505") {
+    let data;
+    try {
+      const result = await query(
+        "INSERT INTO users (name, email, role) VALUES ($1,$2,$3) RETURNING *",
+        [newUser.name, newUser.email, newUser.role]
+      );
+      data = result.rows;
+    } catch (error: any) {
+      if (error?.code === "23505") {
         return NextResponse.json(
           {
             message: "Email already exists",
-            error: error.details,
+            error: error.detail,
           },
           { status: 409 }
         );
       }
 
       return NextResponse.json(
-        { message: "Failed to create user", error },
+        { message: "Failed to create user", error: error?.message || error },
         { status: 500 }
       );
     }

@@ -25,7 +25,7 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
     const [proofUrl, setProofUrl] = useState<string | null>(null)
     const [isSubmitting, setIsSubmitting] = useState(false) // untuk submit
     const [isDeleting, setIsDeleting] = useState(false) // untuk delete
-    const setUpdated = useGlobalStore(state => state.setUpdated)
+    const triggerUpdate = useGlobalStore(state => state.triggerUpdate)
 
 
     useEffect(() => {
@@ -102,7 +102,7 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
                     theme: 'dark',
                 })
                 setIsEditMode(false)
-                setUpdated(true)
+                triggerUpdate()
                 onClose()
             } else {
                 throw new Error('Gagal menyimpan')
@@ -142,7 +142,7 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
                     type: 'success',
                     theme: 'dark',
                 })
-                setUpdated(true)
+                triggerUpdate()
                 onClose()
             } else {
                 throw new Error('Gagal menghapus')

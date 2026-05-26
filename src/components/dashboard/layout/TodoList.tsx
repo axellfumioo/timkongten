@@ -36,8 +36,7 @@ export default function TodoList() {
   const [modalOpen, setModalOpen] = useState(false)
   const [events, setEvents] = useState<ContentEvent[]>([])
   const [selectedContent, setSelectedContent] = useState<ContentEvent | null>(null)
-  const updated = useGlobalStore((state) => state.updated)
-  const setUpdated = useGlobalStore((state) => state.setUpdated)
+  const updateTrigger = useGlobalStore((state) => state.updateTrigger)
   const [selectedDate, setSelectedDate] = useState<SelectedDate>(getTodayDate)
 
   const selectedDateStr = `${selectedDate.year}-${String(selectedDate.month + 1).padStart(2, '0')}-${String(selectedDate.day).padStart(2, '0')}`
@@ -59,14 +58,14 @@ export default function TodoList() {
         console.error('Error fetching events:', error)
         setEvents([])
       } finally {
-        setUpdated(false)
+      } finally {
         setIsLoading(false)
       }
     }
 
 
     fetchEvents()
-  }, [updated, selectedDateStr, setUpdated])
+  }, [updateTrigger, selectedDateStr])
 
   const filteredEvents = events.filter((e) => e.content_date === selectedDateStr)
 

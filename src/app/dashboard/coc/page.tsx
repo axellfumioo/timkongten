@@ -30,8 +30,8 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedContent, setSelectedContent] = useState<any | null>(null)
-  const setUpdated = useGlobalStore((state) => state.setUpdated)
-  const updated = useGlobalStore((state) => state.updated)
+  const triggerUpdate = useGlobalStore((state) => state.triggerUpdate)
+  const updateTrigger = useGlobalStore((state) => state.updateTrigger)
 
   const dateFormatted = `${selectedDate.year}-${String(selectedDate.month + 1).padStart(2, '0')}-${String(
     selectedDate.day
@@ -71,11 +71,10 @@ const App = () => {
   }, [dateFormatted])
 
   useEffect(() => {
-    if (updated) {
+    if (updateTrigger > 0) {
       fetchEvents()
-      setUpdated(false)
     }
-  }, [updated, dateFormatted])
+  }, [updateTrigger, dateFormatted])
 
   return (
     <AuthGuard>
@@ -103,7 +102,7 @@ const App = () => {
             <section className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8 mb-12">
               {/* Kiri: Kalender */}
               <div className="space-y-8">
-                <Calendar selectedDate={selectedDate} setSelectedDate={setSelectedDate} updated={updated} />
+                <Calendar selectedDate={selectedDate} setSelectedDate={setSelectedDate} updateTrigger={updateTrigger} />
               </div>
 
               {/* Kanan: Motivasi & Daftar Konten */}

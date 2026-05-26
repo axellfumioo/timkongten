@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/app/lib/supabase";
+import { query } from "@/app/lib/postgres";
 
 export async function DELETE(req: Request) {
   try {
@@ -13,20 +13,12 @@ export async function DELETE(req: Request) {
       );
     }
 
-    const { data, error } = await supabase
-      .from("users")
-      .delete()
-      .eq("email", body.email)
-      .select();
+    const result = await query(
+      "DELETE FROM users WHERE email = $1 RETURNING *",
+      [body.email]
+    );
 
-    if (error) {
-      return NextResponse.json(
-        { message: "Failed to delete user", error },
-        { status: 500 }
-      );
-    }
-
-    if (!data || data.length === 0) {
+    if (result.rowCount === 0) {
       return NextResponse.json(
         { message: "User not found" },
         { status: 404 }
@@ -34,7 +26,7 @@ export async function DELETE(req: Request) {
     }
 
     return NextResponse.json(
-      { message: "User deleted successfully", data },
+      { message: "User deleted successfully", data: result.rows },
       { status: 200 }
     );
   } catch (err: any) {

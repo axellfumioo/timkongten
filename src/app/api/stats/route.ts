@@ -1,6 +1,8 @@
-import { supabase } from "@/app/lib/supabase";
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from "next/server";
 import { cacheHelper } from "@/lib/redis";
+import { query } from "@/app/lib/postgres";
 
 export async function GET(req: NextRequest) {
   try {
@@ -8,14 +10,13 @@ export async function GET(req: NextRequest) {
     const stats = await cacheHelper.getOrSet(
       'stats',
       async () => {
-        const { data, error } = await supabase.rpc("get_statistics");
+        const evidenceResult = await query("SELECT count(*) FROM evidence");
+        const contentResult = await query("SELECT count(*) FROM content");
 
-        if (error) {
-          console.error("Error fetching stats via RPC:", error.message);
-          throw new Error("Gagal mengambil statistik");
-        }
-
-        return data;
+        return {
+          total_evidences: parseInt(evidenceResult.rows[0].count, 10),
+          total_contents: parseInt(contentResult.rows[0].count, 10)
+        };
       },
       600 // Cache 10 menit
     );

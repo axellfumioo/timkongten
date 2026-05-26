@@ -1,48 +1,58 @@
 // app/api/activity-log/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { supabase } from "@/app/lib/supabase";
 import { authOptions } from "@/app/lib/authOptions";
+import { query } from "@/app/lib/postgres";
 
 // Helper function to fetch data
-async function fetchData(search: string, type: string, page: number, pageSize: number) {
+async function fetchData(
+  search: string,
+  type: string,
+  page: number,
+  pageSize: number
+) {
   const offset = (page - 1) * pageSize;
-  
-  let query = supabase
-    .from("activity_logs")
-    .select(
-      "user_email,user_name,activity_type,activity_name,activity_message,activity_date",
-      { count: "exact" }
-    )
-    .order("activity_date", { ascending: false });
+
+  const clauses: string[] = [];
+  const params: any[] = [];
 
   if (search) {
-    const safeSearch = search.replace(/[%_\\]/g, '\\$&').substring(0, 50);
-    query = query.or(
-      `user_name.ilike.%${safeSearch}%,activity_name.ilike.%${safeSearch}%,activity_message.ilike.%${safeSearch}%`
+    const safeSearch = search.replace(/[%_\\]/g, "\\$&").substring(0, 50);
+    const searchTerm = `%${safeSearch}%`;
+    clauses.push(
+      "(user_name ILIKE $1 ESCAPE '\\' OR activity_name ILIKE $1 ESCAPE '\\' OR activity_message ILIKE $1 ESCAPE '\\')"
     );
+    params.push(searchTerm);
   }
 
   if (type) {
-    query = query.eq("activity_type", type);
+    clauses.push(`activity_type = $${params.length + 1}`);
+    params.push(type);
   }
 
-  query = query.range(offset, offset + pageSize - 1);
+  const whereSql = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
 
-  const { data, error, count } = await query;
+  const countResult = await query<{ count: string }>(
+    `SELECT COUNT(*) as count FROM activity_logs ${whereSql}`,
+    params
+  );
 
-  if (error) {
-    throw error;
-  }
+  const total = Number(countResult.rows[0]?.count ?? 0);
+
+  const dataParams = [...params, pageSize, offset];
+  const dataResult = await query(
+    `SELECT user_email, user_name, activity_type, activity_name, activity_message, activity_date FROM activity_logs ${whereSql} ORDER BY activity_date DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    dataParams
+  );
 
   return {
     success: true,
-    data,
+    data: dataResult.rows,
     pagination: {
       page,
       pageSize,
-      total: count,
-      totalPages: Math.ceil((count ?? 0) / pageSize),
+      total,
+      totalPages: Math.ceil(total / pageSize),
     },
   };
 }
@@ -69,8 +79,9 @@ export async function POST(req: NextRequest) {
 
   try {
     // Insert the new activity log
-    const { data, error } = await supabase.from("activity_logs").insert([
-      {
+    const result = await query(
+      "INSERT INTO activity_logs (user_email, user_name, activity_type, activity_name, activity_message, activity_url, activity_agent, activity_method, activity_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id",
+      [
         user_email,
         user_name,
         activity_type,
@@ -79,19 +90,14 @@ export async function POST(req: NextRequest) {
         activity_url,
         activity_agent,
         activity_method,
-        activity_date: timestamp,
-      },
-    ]);
+        timestamp,
+      ]
+    );
 
-    if (error) {
-      console.error("Supabase insert error:", error);
-      return NextResponse.json(
-        { success: false, error: error.message },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ success: true, data }, { status: 201 });
+    return NextResponse.json(
+      { success: true, data: result.rows },
+      { status: 201 }
+    );
   } catch (err) {
     console.error("Unexpected error:", err);
     return NextResponse.json(
@@ -118,7 +124,7 @@ export async function GET(req: NextRequest) {
   const pageSize = Math.min(parseInt(searchParams.get("pageSize") || "10"), 100);
 
   try {
-    // Fetch data from Supabase
+    // Fetch data from database
     const response = await fetchData(search, type, page, pageSize);
 
     return NextResponse.json(response, { 

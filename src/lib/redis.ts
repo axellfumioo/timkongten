@@ -70,15 +70,38 @@ export const cacheHelper = {
    * Invalidate cache by pattern
    */
   async invalidatePattern(pattern: string): Promise<void> {
-    try {
-      const keys = await redis.keys(pattern);
-      if (keys.length > 0) {
-        await redis.del(...keys);
-        console.log(`Cache invalidated (${keys.length} keys): ${pattern}`);
-      }
-    } catch (error) {
-      console.error('Cache pattern invalidation error:', error);
-    }
+    return new Promise((resolve) => {
+      let count = 0;
+      const stream = redis.scanStream({
+        match: pattern,
+        count: 100
+      });
+
+      stream.on('data', (keys: string[]) => {
+        if (keys.length > 0) {
+          count += keys.length;
+          stream.pause();
+          redis.del(...keys).then(() => {
+            stream.resume();
+          }).catch(err => {
+            console.error('Error deleting keys during scan:', err);
+            stream.resume();
+          });
+        }
+      });
+
+      stream.on('end', () => {
+        if (count > 0) {
+          console.log(`Cache invalidated (${count} keys): ${pattern}`);
+        }
+        resolve();
+      });
+
+      stream.on('error', (error) => {
+        console.error('Cache pattern invalidation error:', error);
+        resolve();
+      });
+    });
   },
 
   /**

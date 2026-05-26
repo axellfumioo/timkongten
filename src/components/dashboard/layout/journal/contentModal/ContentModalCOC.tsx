@@ -23,7 +23,7 @@ const ContentModalCOC = ({ isOpen, onClose, selectedContent }: ContentModalProps
     const [isDeleting, setIsDeleting] = useState(false)
     const [isSubmit, setIsSubmit] = useState(false)
     const [copied, setCopied] = useState(false)
-    const setUpdated = useGlobalStore(state => state.setUpdated);
+    const triggerUpdate = useGlobalStore(state => state.triggerUpdate);
 
     useEffect(() => {
         if (selectedContent) {
@@ -87,7 +87,7 @@ const ContentModalCOC = ({ isOpen, onClose, selectedContent }: ContentModalProps
                         theme: "dark",
                     })
                     onClose()
-                    setUpdated(true)
+                    triggerUpdate()
                 } else {
                     new Toast({
                         position: "top-right",
@@ -123,7 +123,7 @@ const ContentModalCOC = ({ isOpen, onClose, selectedContent }: ContentModalProps
                         theme: "dark",
                     })
                     setIsEditMode(false)
-                    setUpdated(true)
+                    triggerUpdate()
                 } else {
                     new Toast({
                         position: "top-right",
@@ -162,7 +162,7 @@ const ContentModalCOC = ({ isOpen, onClose, selectedContent }: ContentModalProps
                     theme: "dark",
                 })
                 onClose()
-                setUpdated(true)
+                triggerUpdate()
             } else {
                 new Toast({
                     position: "top-right",

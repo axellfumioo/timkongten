@@ -1,9 +1,11 @@
-import { supabase } from "@/app/lib/supabase";
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { logActivity } from "@/app/lib/logActivity";
 import { authOptions } from "@/app/lib/authOptions";
 import { cacheHelper } from "@/lib/redis";
+import { query, withTransaction } from "@/app/lib/postgres";
 
 import { randomUUID } from "crypto";
 
@@ -30,16 +32,26 @@ export async function GET(req: Request) {
     const data = await cacheHelper.getOrSet(
       cacheKey,
       async () => {
-        const { data: dbData, error } = await supabase.rpc("get_content", {
-          filter_date: date || null,
-          row_limit: limit,
+        let sql = "SELECT *, TO_CHAR(content_date, 'YYYY-MM-DD') AS formatted_date FROM content";
+        const params: any[] = [];
+        if (date) {
+           sql += " WHERE content_date = $1";
+           params.push(date);
+           sql += " ORDER BY created_at DESC LIMIT $2";
+           params.push(limit);
+        } else {
+           sql += " ORDER BY created_at DESC LIMIT $1";
+           params.push(limit);
+        }
+        const result = await query(sql, params);
+
+        const rows = (result.rows || []).map((row: any) => {
+          row.content_date = row.formatted_date;
+          delete row.formatted_date;
+          return row;
         });
 
-        if (error) {
-          throw new Error(error.message);
-        }
-
-        return dbData || [];
+        return rows;
       },
       300 // Cache 5 menit
     );
@@ -86,50 +98,50 @@ export async function POST(req: NextRequest) {
 
   const content_id = randomUUID();
 
-  // Insert content dulu, tunggu hasilnya
-  const { data: contentData, error: contentError } = await supabase
-    .from("content")
-    .insert([
-      {
-        id: content_id,
-        user_email: user.email,
-        user_name: user.name,
-        content_category,
-        content_type,
-        content_title,
-        content_caption,
-        content_feedback,
-        content_date,
-      },
-    ])
-    .select();
+  let contentData = [] as any[];
+  let evidenceData = [] as any[];
 
-  if (contentError) {
-    return NextResponse.json({ error: contentError.message }, { status: 500 });
-  }
+  try {
+    const result = await withTransaction(async (client) => {
+      const contentResult = await client.query(
+        "INSERT INTO content (id, user_email, user_name, content_category, content_type, content_title, content_caption, content_feedback, content_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *",
+        [
+          content_id,
+          user.email,
+          user.name,
+          content_category,
+          content_type,
+          content_title,
+          content_caption,
+          content_feedback,
+          content_date,
+        ]
+      );
 
-  // Insert evidence setelah content berhasil
-  const { data: evidenceData, error: evidenceError } = await supabase
-    .from("evidence")
-    .insert([
-      {
-        evidence_title: `Membuat ide konten`,
-        evidence_description: `Membuat Calendar Of Content pada tanggal "${content_date}" dengan judul "${content_title}"`,
-        evidence_date: content_date,
-        content_id: content_id,
-        evidence_job: `COC-${content_date}`,
-        evidence_status: "accepted",
-        user_email: user.email,
-      },
-    ])
-    .select();
+      const evidenceResult = await client.query(
+        "INSERT INTO evidence (evidence_title, evidence_description, evidence_date, content_id, evidence_job, evidence_status, user_email) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+        [
+          "Membuat ide konten",
+          `Membuat Calendar Of Content pada tanggal "${content_date}" dengan judul "${content_title}"`,
+          content_date,
+          content_id,
+          `COC-${content_date}`,
+          "accepted",
+          user.email,
+        ]
+      );
 
-  if (evidenceError) {
-    console.error(`Insert evidence failed: ${evidenceError.message}`);
-    return NextResponse.json(
-      { content: contentData, evidenceError: evidenceError.message },
-      { status: 500 }
-    );
+      return {
+        content: contentResult.rows,
+        evidence: evidenceResult.rows,
+      };
+    });
+
+    contentData = result.content;
+    evidenceData = result.evidence;
+  } catch (error: any) {
+    console.error("Insert content/evidence failed:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   // Invalidate cache setelah insert

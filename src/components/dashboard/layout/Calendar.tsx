@@ -18,12 +18,12 @@ interface CalendarProps {
     selectedDate: SelectedDate | null
     setSelectedDate: (date: SelectedDate) => void
     // external trigger from parent; when this changes to a truthy value, refetch events
-    updated?: boolean | number
+    updateTrigger?: number
 }
 
 const weekdays = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
 
-const Calendar = ({ selectedDate, setSelectedDate, updated }: CalendarProps) => {
+const Calendar = ({ selectedDate, setSelectedDate, updateTrigger }: CalendarProps) => {
     const today = new Date()
     const [currentDate, setCurrentDate] = useState(new Date())
     const [events, setEvents] = useState<Record<string, string>>({})
@@ -57,11 +57,11 @@ const Calendar = ({ selectedDate, setSelectedDate, updated }: CalendarProps) => 
         }
     }, [])
 
-    // fetch again when parent `updated` prop changes to a truthy value
+    // fetch again when parent `updateTrigger` prop changes
     useEffect(() => {
-        if (!updated) return
+        if (!updateTrigger) return
         fetchEvents()
-    }, [updated])
+    }, [updateTrigger])
 
 
     const getDaysInMonth = (year: number, month: number) =>

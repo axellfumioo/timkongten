@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { TrashIcon, SquarePen, MailIcon, UserIcon, Search } from 'lucide-react'
-import { supabase } from '@/app/lib/supabase'
 import { useGlobalStore } from '@/app/lib/global-store'
 import ConfirmationModal from '@/components/dashboard/layout/confirmationModal'
 
@@ -22,35 +21,52 @@ export default function UserTable({ setSelectedUser, setModalOpen }: any) {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [loadingDelete, setLoadingDelete] = useState(false);
 
-  const updated = useGlobalStore((state) => state.updated)
-  const setUpdated = useGlobalStore((state) => state.setUpdated)
+  const updateTrigger = useGlobalStore((state) => state.updateTrigger)
+  const triggerUpdate = useGlobalStore((state) => state.triggerUpdate)
 
   const confirmDelete = async () => {
     setLoadingDelete(true);
     if (!userToDelete) return
     try {
-      await supabase.from('users').delete().eq('id', userToDelete.id)
-      setUpdated(true)
-      setUserToDelete(null)
+      const res = await fetch(`/api/admin/users/${userToDelete.id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        triggerUpdate()
+        setUserToDelete(null)
+      } else {
+        const data = await res.json();
+        console.error("Failed to delete user:", data.error);
+      }
+    } catch (err) {
+      console.error("Error deleting user:", err);
     } finally {
       setLoadingDelete(false);
+      setConfirmOpen(false);
     }
   }
 
   useEffect(() => {
     const fetchUsers = async () => {
       setIsLoading(true)
-      const { data, error } = await supabase.from('users').select('*')
-      if (!error) {
-        setUsers(data || [])
-        setFilteredUsers(data || [])
+      try {
+        const res = await fetch('/api/admin/users')
+        const data = await res.json()
+        if (res.ok) {
+          setUsers(data || [])
+          setFilteredUsers(data || [])
+        } else {
+          console.error("Failed to fetch users:", data.error)
+        }
+      } catch (err) {
+        console.error("Error fetching users:", err)
+      } finally {
+        setIsLoading(false)
       }
-      setIsLoading(false)
-      setUpdated(false)
     }
 
     fetchUsers()
-  }, [updated])
+  }, [updateTrigger])
 
   useEffect(() => {
     const term = searchTerm.toLowerCase()
