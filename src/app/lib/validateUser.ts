@@ -6,5 +6,5 @@ export async function validateUser(email: string): Promise<boolean> {
     [email]
   );
 
-  return result.rowCount > 0;
+  return (result.rowCount ?? 0) > 0;
 }

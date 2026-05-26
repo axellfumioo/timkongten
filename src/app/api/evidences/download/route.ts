@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
     const groupedByUser: Record<string, { total: number; accepted: number }> =
       {};
 
-    data.forEach((row) => {
+    data.forEach((row: EvidenceRow) => {
       const userName = row.user_name ?? row.user_email ?? "Unknown User";
       if (!groupedByUser[userName]) {
         groupedByUser[userName] = { total: 0, accepted: 0 };
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
     const historyHeaderRow = worksheet.addRow(historyHeader);
     styleHeaderRow(historyHeaderRow);
 
-    data.forEach((row) => {
+    data.forEach((row: EvidenceRow) => {
       const newRow = worksheet.addRow([
         row.id,
         row.user_name ?? row.user_email ?? "Unknown User",

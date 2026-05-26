@@ -1,4 +1,4 @@
-import { Pool, PoolClient } from "pg";
+import { Pool, PoolClient, QueryResultRow } from "pg";
 
 type PoolConfig = {
   connectionString: string | undefined;
@@ -33,7 +33,7 @@ if (process.env.NODE_ENV !== "production") {
   globalForPg.pgPool = pgPool;
 }
 
-export async function query<T = any>(text: string, params: any[] = []) {
+export async function query<T extends QueryResultRow = any>(text: string, params: any[] = []) {
   return pgPool.query<T>(text, params);
 }
 

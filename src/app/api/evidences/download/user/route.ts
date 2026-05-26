@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
 
     const totalEvidence = data.length;
     const acceptedCount = data.filter(
-      (ev) => ev.evidence_status === "accepted"
+      (ev: EvidenceRow) => ev.evidence_status === "accepted"
     ).length;
 
     // Ambil nama user dari hasil relasi
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
     // ========================
     // Isi data
     // ========================
-    data.forEach((row) => {
+    data.forEach((row: EvidenceRow) => {
       const newRow = worksheet.addRow([
         row.id,
         row.user_name ?? row.user_email ?? "Unknown User",
