@@ -5,6 +5,7 @@ import {
   BookCheck,
   CheckCircle,
   Menu,
+  ScrollText,
 } from 'lucide-react';
 import Sidebar from '@/components/dashboard/common/Sidebar';
 import TodoList from '@/components/dashboard/layout/TodoList';
@@ -21,6 +22,7 @@ interface ContentStats {
   content: number
   evidence: number
   scheduled: number
+  user_evidences: number
 }
 
 function getTodayDate(): SelectedDate {
@@ -40,7 +42,8 @@ function App() {
   const [stats, setStats] = useState<ContentStats>({
     content: 0,
     evidence: 0,
-    scheduled: 0
+    scheduled: 0,
+    user_evidences: 0
   });
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
@@ -61,14 +64,15 @@ function App() {
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/stats`);
+      const response = await fetch(`/api/stats?email=${encodeURIComponent(user.email)}`);
       if (!response.ok) throw new Error("Failed to fetch stats");
       const data = await response.json();
 
       setStats({
         content: data.stats?.total_contents || 0,
         evidence: data.stats?.total_evidences || 0,
-        scheduled: 0
+        scheduled: 0,
+        user_evidences: data.stats?.user_evidences || 0
       });
       setLastUpdated(
         new Date().toLocaleTimeString('id-ID', {
@@ -121,13 +125,20 @@ function App() {
             </div>
 
             <section className="mb-12">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-6 bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl transition-all">
+                  <ScrollText className="text-green-400 mb-2" />
+                  <p className={`text-3xl font-bold ${loading ? "text-white/40 animate-pulse" : ""}`}>
+                    {loading ? "—" : stats.user_evidences}
+                  </p>
+                  <p className="text-sm text-gray-400">Poin Saya</p>
+                </div>
                 <div className="p-6 bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl transition-all">
                   <CheckCircle className="text-green-400 mb-2" />
                   <p className={`text-3xl font-bold ${loading ? "text-white/40 animate-pulse" : ""}`}>
                     {loading ? "—" : stats.evidence}
                   </p>
-                  <p className="text-sm text-gray-400">Total Evidence (semua siswa)</p>
+                  <p className="text-sm text-gray-400">Total Poin (semua siswa)</p>
                 </div>
                 <div className="p-6 bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl transition-all">
                   <BookCheck className="text-indigo-400 mb-2" />

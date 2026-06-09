@@ -5,7 +5,8 @@ import {
     Eye, Edit, TrashIcon, Search, CalendarDays, Plus, UploadCloud, BarChart2, Briefcase,
     Menu,
     Loader2,
-    Save, CheckCircle2, ChevronDown, ChevronUp, X, File as FileIcon
+    Save, CheckCircle2, ChevronDown, ChevronUp, X, File as FileIcon,
+    Link
 } from 'lucide-react';
 import Sidebar from '@/components/dashboard/common/Sidebar';
 import AuthGuard from '@/components/AuthGuard';
@@ -122,7 +123,7 @@ const compressImage = async (file: File): Promise<File> => {
 
 // Komponen Batch Upload untuk CoC Checklist
 function QuickAddRow({ content, onUpload }: { content: any, onUpload: (content: any, entries: any[], job: string) => Promise<boolean> }) {
-    const [entries, setEntries] = useState([{ id: Date.now(), date: content.content_date, file: null as File | null }]);
+    const [entries, setEntries] = useState([{ id: Date.now(), date: content.content_date, link: '' }]);
     const [job, setJob] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -136,12 +137,12 @@ function QuickAddRow({ content, onUpload }: { content: any, onUpload: (content: 
         const success = await onUpload(content, validEntries, job);
         setLoading(false);
         if (success) {
-            setEntries([{ id: Date.now(), date: content.content_date, file: null }]);
+            setEntries([{ id: Date.now(), date: content.content_date, link: '' }]);
             setJob('');
         }
     };
 
-    const addEntry = () => setEntries([...entries, { id: Date.now(), date: content.content_date, file: null }]);
+    const addEntry = () => setEntries([...entries, { id: Date.now(), date: content.content_date, link: '' }]);
     const removeEntry = (id: number) => setEntries(entries.filter(e => e.id !== id));
     const updateEntry = (id: number, field: string, value: any) => {
         setEntries(entries.map(e => e.id === id ? { ...e, [field]: value } : e));
@@ -161,11 +162,11 @@ function QuickAddRow({ content, onUpload }: { content: any, onUpload: (content: 
                     </div>
                     <h4 className="font-extrabold text-xl text-white line-clamp-1 tracking-tight">{content.content_title}</h4>
                 </div>
-                
+
                 <div className="w-full lg:w-auto relative">
                     <Briefcase size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
-                    <select 
-                        value={job} 
+                    <select
+                        value={job}
                         onChange={(e) => setJob(e.target.value)}
                         className="appearance-none bg-black/40 border border-white/10 hover:border-white/20 rounded-xl pl-11 pr-10 py-3 text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-white/20 w-full lg:w-auto min-w-[220px] transition-all cursor-pointer"
                     >
@@ -194,22 +195,26 @@ function QuickAddRow({ content, onUpload }: { content: any, onUpload: (content: 
                         <div key={entry.id} className="group/row flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-black/20 p-2 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
                             <div className="relative w-full sm:w-[160px]">
                                 <CalendarDays size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
-                                <input 
-                                    type="date" 
+                                <input
+                                    type="date"
+                                    max={new Date().toISOString().split('T')[0]}
                                     value={entry.date}
                                     onChange={(e) => updateEntry(entry.id, 'date', e.target.value)}
                                     className="bg-transparent border border-white/10 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20 w-full hover:bg-white/5 transition-all"
                                 />
                             </div>
-                            
-                            <div className="relative border border-white/10 rounded-xl px-4 py-3 bg-white/5 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-3 flex-1 w-full transition-all group-hover/row:border-white/20">
-                                <div className={`p-1.5 rounded-lg ${entry.file ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-white/50'}`}>
+
+                            <div className="relative border border-white/10 rounded-xl px-4 py-3 bg-white/5 hover:bg-white/10 text-sm flex items-center gap-3 flex-1 w-full transition-all group-hover/row:border-white/20">
+                                <div className={`p-1.5 rounded-lg ${entry.link ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-white/50'}`}>
                                     <UploadCloud size={16} />
                                 </div>
-                                <span className={`truncate flex-1 text-left font-medium ${entry.file ? 'text-white' : 'text-white/50'}`}>
-                                    {entry.file ? entry.file.name : "Unggah File Bukti (Opsional)"}
-                                </span>
-                                <input type="file" accept="image/*,.pdf" onChange={(e) => { if(e.target.files?.[0]) updateEntry(entry.id, 'file', e.target.files[0]) }} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                                <input
+                                    type="url"
+                                    placeholder="Masukkan link bukti (Opsional)"
+                                    value={entry.link}
+                                    onChange={(e) => updateEntry(entry.id, 'link', e.target.value)}
+                                    className="bg-transparent border-none text-white focus:outline-none w-full"
+                                />
                             </div>
 
                             {entries.length > 1 && (
@@ -223,8 +228,8 @@ function QuickAddRow({ content, onUpload }: { content: any, onUpload: (content: 
             </div>
 
             <div className="flex justify-end pt-2">
-                <button 
-                    onClick={handleUpload} 
+                <button
+                    onClick={handleUpload}
                     disabled={loading || !job || entries.filter(e => e.date).length === 0}
                     className="bg-white text-black hover:bg-gray-200 rounded-xl px-8 py-3 text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-white/10 hover:shadow-white/20 hover:-translate-y-0.5 active:translate-y-0"
                 >
@@ -241,7 +246,7 @@ function QuickAddRow({ content, onUpload }: { content: any, onUpload: (content: 
 
 // Komponen Batch Upload Manual
 function QuickAddManualForm({ onUploadManual }: { onUploadManual: (formData: any, entries: any[]) => Promise<boolean> }) {
-    const [entries, setEntries] = useState([{ id: Date.now(), date: '', file: null as File | null }]);
+    const [entries, setEntries] = useState([{ id: Date.now(), date: '', link: '' }]);
     const [formData, setFormData] = useState({
         evidence_title: '',
         evidence_description: '',
@@ -255,7 +260,7 @@ function QuickAddManualForm({ onUploadManual }: { onUploadManual: (formData: any
         setFormData({ ...formData, [name]: value });
     };
 
-    const addEntry = () => setEntries([...entries, { id: Date.now(), date: '', file: null }]);
+    const addEntry = () => setEntries([...entries, { id: Date.now(), date: '', link: '' }]);
     const removeEntry = (id: number) => setEntries(entries.filter(e => e.id !== id));
     const updateEntry = (id: number, field: string, value: any) => {
         setEntries(entries.map(e => e.id === id ? { ...e, [field]: value } : e));
@@ -274,14 +279,14 @@ function QuickAddManualForm({ onUploadManual }: { onUploadManual: (formData: any
         setLoading(false);
         if (success) {
             setFormData({ evidence_title: '', evidence_description: '', evidence_job: '' });
-            setEntries([{ id: Date.now(), date: '', file: null }]);
+            setEntries([{ id: Date.now(), date: '', link: '' }]);
             setIsOpen(false);
         }
     };
 
     return (
         <div className={`bg-gradient-to-br from-white/[0.04] to-transparent border border-white/10 rounded-3xl overflow-hidden mb-8 transition-all duration-500 shadow-xl ${isOpen ? 'shadow-white/5 ring-1 ring-white/10' : 'hover:bg-white/[0.06] hover:border-white/20'}`}>
-            <button 
+            <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full flex items-center justify-between p-6 transition-all group"
             >
@@ -296,7 +301,7 @@ function QuickAddManualForm({ onUploadManual }: { onUploadManual: (formData: any
                 </div>
                 {isOpen ? <ChevronUp size={24} className="text-white/40" /> : <ChevronDown size={24} className="text-white/40 group-hover:text-white/60 transition-colors" />}
             </button>
-            
+
             <div className={`transition-all duration-500 ease-in-out origin-top ${isOpen ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'}`}>
                 <div className="p-6 pt-0 border-t border-white/5">
                     <form className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6" onSubmit={handleSubmit}>
@@ -324,7 +329,7 @@ function QuickAddManualForm({ onUploadManual }: { onUploadManual: (formData: any
                             <label className="text-xs font-bold text-white/50 uppercase tracking-widest pl-1">Keterangan Tambahan</label>
                             <textarea name="evidence_description" value={formData.evidence_description} onChange={handleChange} placeholder="Ceritakan detail pengerjaan atau cantumkan link relevan..." className="w-full rounded-xl border border-white/10 bg-black/30 text-white px-5 py-4 h-24 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-white/20 transition-all placeholder:text-white/20" />
                         </div>
-                        
+
                         <div className="md:col-span-2 mt-4 p-5 bg-black/20 rounded-2xl border border-white/5">
                             <div className="flex items-center justify-between mb-5 px-1">
                                 <label className="text-xs font-bold text-white/50 uppercase tracking-widest">Daftar Baris Evidence</label>
@@ -332,28 +337,32 @@ function QuickAddManualForm({ onUploadManual }: { onUploadManual: (formData: any
                                     <Plus size={14} /> Tambah Baris
                                 </button>
                             </div>
-                            
+
                             <div className="space-y-3">
                                 {entries.map((entry, index) => (
                                     <div key={entry.id} className="group/row flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-white/[0.02] p-2 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
                                         <div className="relative w-full sm:w-[170px]">
                                             <CalendarDays size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
-                                            <input 
-                                                type="date" 
+                                            <input
+                                                type="date"
+                                                max={new Date().toISOString().split('T')[0]}
                                                 value={entry.date}
                                                 onChange={(e) => updateEntry(entry.id, 'date', e.target.value)}
                                                 className="bg-black/30 border border-white/10 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20 w-full hover:bg-white/5 transition-all"
                                             />
                                         </div>
-                                        
-                                        <div className="relative border border-white/10 rounded-xl px-4 py-3 bg-white/5 hover:bg-white/10 cursor-pointer text-sm flex items-center gap-3 flex-1 w-full transition-all group-hover/row:border-white/20">
-                                            <div className={`p-1.5 rounded-lg ${entry.file ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-white/50'}`}>
-                                                <UploadCloud size={16} />
+
+                                        <div className="relative border border-white/10 rounded-xl px-4 py-3 bg-white/5 hover:bg-white/10 text-sm flex items-center gap-3 flex-1 w-full transition-all group-hover/row:border-white/20">
+                                            <div className={`p-1.5 rounded-lg ${entry.link ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-white/50'}`}>
+                                                <Link size={16} />
                                             </div>
-                                            <span className={`truncate flex-1 text-left font-medium ${entry.file ? 'text-white' : 'text-white/50'}`}>
-                                                {entry.file ? entry.file.name : "Unggah File Bukti (Opsional)"}
-                                            </span>
-                                            <input type="file" accept="image/*,.pdf" onChange={(e) => { if(e.target.files?.[0]) updateEntry(entry.id, 'file', e.target.files[0]) }} className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+                                            <input
+                                                type="url"
+                                                placeholder="Masukkan link bukti (Opsional)"
+                                                value={entry.link}
+                                                onChange={(e) => updateEntry(entry.id, 'link', e.target.value)}
+                                                className="bg-transparent border-none text-white focus:outline-none w-full"
+                                            />
                                         </div>
 
                                         {entries.length > 1 && (
@@ -428,11 +437,11 @@ function EvidenceDashboard() {
 
             const mapped: Evidence[] = (data.data || []).map((item: any) => ({
                 id: item.id,
-                title: item.evidence_title,
-                description: item.evidence_description,
-                job: item.evidence_job,
-                status: item.evidence_status,
-                date: item.evidence_date,
+                title: item.evidence_title || '',
+                description: item.evidence_description || '',
+                job: item.evidence_job || '',
+                status: item.evidence_status || 'pending',
+                date: item.evidence_date || '',
                 content_id: item.content_id
             }));
 
@@ -503,32 +512,27 @@ function EvidenceDashboard() {
     const handleUploadEvidence = async (content: any, entries: any[], job: string): Promise<boolean> => {
         try {
             let successCount = 0;
-            
-            // Upload in sequence or parallel. Parallel might overload the connection or API, sequence is safer for compression.
-            for (const entry of entries) {
-                let fileToUpload = entry.file;
-                if (entry.file && entry.file.type.startsWith('image/')) {
-                    try {
-                        fileToUpload = await compressImage(entry.file);
-                    } catch (error) {
-                        console.error('Gagal kompresi:', error);
+            const batchSize = 3;
+
+            for (let i = 0; i < entries.length; i += batchSize) {
+                const batch = entries.slice(i, i + batchSize);
+                const uploadPromises = batch.map(async (entry) => {
+                    const formPayload = new FormData();
+                    formPayload.append('evidence_title', content.content_title);
+                    formPayload.append('evidence_description', content.content_caption || '-');
+                    formPayload.append('evidence_date', entry.date); // Gunakan tanggal dari entry!
+                    formPayload.append('evidence_job', job);
+                    formPayload.append('content_id', content.id);
+                    if (entry.link) {
+                        formPayload.append('completion_proof', entry.link);
                     }
-                }
 
-                const formPayload = new FormData();
-                formPayload.append('evidence_title', content.content_title);
-                formPayload.append('evidence_description', content.content_caption || '-');
-                formPayload.append('evidence_date', entry.date); // Gunakan tanggal dari entry!
-                formPayload.append('evidence_job', job);
-                formPayload.append('content_id', content.id);
-                if (fileToUpload) {
-                    formPayload.append('completion_proof', fileToUpload);
-                }
+                    const response = await fetch('/api/evidences', { method: 'POST', body: formPayload });
+                    return response.ok;
+                });
 
-                const response = await fetch('/api/evidences', { method: 'POST', body: formPayload });
-                if (response.ok) {
-                    successCount++;
-                }
+                const results = await Promise.all(uploadPromises);
+                successCount += results.filter(ok => ok).length;
             }
 
             if (successCount === entries.length) {
@@ -554,31 +558,27 @@ function EvidenceDashboard() {
     const handleUploadManual = async (formData: any, entries: any[]): Promise<boolean> => {
         try {
             let successCount = 0;
-            
-            for (const entry of entries) {
-                let fileToUpload = entry.file;
-                if (entry.file && entry.file.type.startsWith('image/')) {
-                    try {
-                        fileToUpload = await compressImage(entry.file);
-                    } catch (error) {
-                        console.error('Gagal kompresi:', error);
+            const batchSize = 3;
+
+            for (let i = 0; i < entries.length; i += batchSize) {
+                const batch = entries.slice(i, i + batchSize);
+                const uploadPromises = batch.map(async (entry) => {
+                    const formPayload = new FormData();
+                    formPayload.append('evidence_title', formData.evidence_title);
+                    formPayload.append('evidence_description', formData.evidence_description);
+                    formPayload.append('evidence_date', entry.date); // Gunakan tanggal dari entry!
+                    formPayload.append('evidence_job', formData.evidence_job);
+                    formPayload.append('content_id', '');
+                    if (entry.link) {
+                        formPayload.append('completion_proof', entry.link);
                     }
-                }
 
-                const formPayload = new FormData();
-                formPayload.append('evidence_title', formData.evidence_title);
-                formPayload.append('evidence_description', formData.evidence_description);
-                formPayload.append('evidence_date', entry.date); // Gunakan tanggal dari entry!
-                formPayload.append('evidence_job', formData.evidence_job);
-                formPayload.append('content_id', '');
-                if (fileToUpload) {
-                    formPayload.append('completion_proof', fileToUpload);
-                }
+                    const response = await fetch('/api/evidences', { method: 'POST', body: formPayload });
+                    return response.ok;
+                });
 
-                const response = await fetch('/api/evidences', { method: 'POST', body: formPayload });
-                if (response.ok) {
-                    successCount++;
-                }
+                const results = await Promise.all(uploadPromises);
+                successCount += results.filter(ok => ok).length;
             }
 
             if (successCount === entries.length) {
@@ -663,7 +663,7 @@ function EvidenceDashboard() {
                         <div className="flex flex-col md:flex-row w-full gap-y-6 md:gap-x-8">
                             {/* Left section - Search & List */}
                             <div className="w-full md:flex-1">
-                                
+
                                 {/* Quick Add Checklist Section */}
                                 <div className="mb-8">
                                     <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">

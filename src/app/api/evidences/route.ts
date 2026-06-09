@@ -111,33 +111,15 @@ export async function POST(req: Request) {
     const evidence_date = formData.get("evidence_date") as string;
     const evidence_job = formData.get("evidence_job") as string;
     const content_id = formData.get("content_id") as string | null;
-    const file = formData.get("completion_proof") as File | null;
+    const completion_proof = formData.get("completion_proof") as string | null;
 
-    // ===== Upload File =====
-    let fileUrl: string | null = null;
-    let uploadTime = 0;
-    if (file && file.name) {
-      const fileExt = file.name.split(".").pop();
-      const filename = `${randomUUID()}.${fileExt}`;
-      const uploadStart = Date.now();
-      fileUrl = await uploadToB2(file, filename, process.env.B2_BUCKET!);
-      uploadTime = Date.now() - uploadStart;
-    }
-
-    if (file && !fileUrl) {
-      return NextResponse.json(
-        { error: "Gagal mengunggah file ke R2" },
-        { status: 500 }
-      );
-    }
+    const fileUrl = completion_proof && completion_proof.trim() !== "" ? completion_proof : null;
 
     const contentIdValue =
       content_id && content_id !== "null" ? content_id : null;
 
-    // ===== DB Insert =====
     const insertStart = Date.now();
-    const [insertResult] = await Promise.all([
-      query(
+    const insertResult = await query(
         "INSERT INTO evidence (user_email, evidence_title, evidence_description, evidence_date, evidence_job, content_id, completion_proof, evidence_status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id",
         [
           user_email,
@@ -149,41 +131,36 @@ export async function POST(req: Request) {
           fileUrl,
           "pending",
         ]
-      ),
-      logActivity({
-        user_name: user.name,
-        user_email,
-        activity_type: "evidence",
-        activity_name: "Evidence Created",
-        activity_message: `${user.name} created evidence "${evidence_title}"`,
-      }),
-    ]);
+    );
     const insertTime = Date.now() - insertStart;
 
     if (insertResult.rowCount === 0) {
       return NextResponse.json({ error: "Insert gagal" }, { status: 500 });
     }
 
+    // Invalidate cache immediately to prevent stale GET requests
+    await cacheHelper.invalidateEvidences(user_email);
+
+    logActivity({
+      user_name: user.name,
+      user_email,
+      activity_type: "evidence",
+      activity_name: "Evidence Created",
+      activity_message: `${user.name} created evidence "${evidence_title}"`,
+    }).catch(err => console.error("Background task error:", err));
+
     const profiling = {
-      upload_b2: `${uploadTime}ms`,
       insert_db: `${insertTime}ms`,
       total: `${Date.now() - totalStart}ms`,
     };
 
     console.log("[POST /evidences]", profiling);
 
-    // Invalidate cache setelah insert
-    await cacheHelper.invalidatePattern(`evidence:${user_email}:*`);
-    await cacheHelper.invalidatePattern('evidence:all:*');
-    await cacheHelper.invalidate('stats');
-    await cacheHelper.invalidatePattern('admin:evidences:*');
-
     return NextResponse.json(
       { message: "Evidence created successfully", url: fileUrl, profiling },
       {
         status: 201,
         headers: {
-          "X-Upload-R2": `${uploadTime}ms`,
           "X-DB-Insert": `${insertTime}ms`,
           "X-Total-Time": `${Date.now() - totalStart}ms`,
         },

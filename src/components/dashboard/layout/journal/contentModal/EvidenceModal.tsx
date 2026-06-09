@@ -71,11 +71,20 @@ export default function EvidenceModal({ proofOpen, setProofOpen, selectedId }: P
                     <h2 className="text-2xl font-semibold mb-6">
                         Completion Proof {selectedContent.evidence_title}
                     </h2>
-                    <img
-                        src={selectedContent.completion_proof}
-                        alt={selectedContent.evidence_title || "Evidence Proof"}
-                        className="max-w-full max-h-[80vh] mx-auto rounded-md shadow-md"
-                    />
+                    {selectedContent.completion_proof ? (
+                        <div className="flex justify-center mt-4">
+                            <a
+                                href={selectedContent.completion_proof.startsWith('http') ? selectedContent.completion_proof : `https://${selectedContent.completion_proof}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="bg-gray-900 hover:bg-gray-800 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-all"
+                            >
+                                Buka Link Bukti 🔗
+                            </a>
+                        </div>
+                    ) : (
+                        <p className="text-center text-gray-400">Tidak ada link bukti</p>
+                    )}
                 </>
             ) : (
                 <p className="text-center text-gray-400">No evidence selected</p>

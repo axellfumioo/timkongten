@@ -38,6 +38,9 @@ export default function EvidenceTable() {
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [loadingAction, setLoadingAction] = useState<'accepted' | 'declined' | null>(null)
 
+  const [selectedEvidences, setSelectedEvidences] = useState<string[]>([])
+  const [isBulkLoading, setIsBulkLoading] = useState(false)
+
   const updateTrigger = useGlobalStore((state) => state.updateTrigger)
 
   // ✅ state users bener
@@ -52,13 +55,13 @@ export default function EvidenceTable() {
     try {
       const res = await fetch('/api/admin/evidences');
       const data = await res.json();
-      
+
       if (!res.ok) {
         console.error("Error fetching evidences:", data.error);
         setIsLoading(false);
         return;
       }
-      
+
       setEvidences(data || [])
       setFiltered(data || [])
     } catch (error) {
@@ -133,6 +136,50 @@ export default function EvidenceTable() {
     }
   }
 
+  // bulk actions
+  const handleToggleEvidence = (id: string) => {
+    if (selectedEvidences.includes(id)) {
+      setSelectedEvidences(selectedEvidences.filter((item) => item !== id))
+    } else {
+      if (selectedEvidences.length >= 20) {
+        alert("Maksimal 20 evidence yang bisa dipilih!")
+        return
+      }
+      setSelectedEvidences([...selectedEvidences, id])
+    }
+  }
+
+  const handleSelectAll = () => {
+    if (selectedEvidences.length > 0) {
+      setSelectedEvidences([])
+    } else {
+      const toSelect = filtered.slice(0, 20).map((ev) => ev.id)
+      setSelectedEvidences(toSelect)
+    }
+  }
+
+  const handleBulkAccept = async () => {
+    if (selectedEvidences.length === 0) return
+    setIsBulkLoading(true)
+    try {
+      await Promise.all(
+        selectedEvidences.map((id) =>
+          fetch(`/api/evidences/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'accepted' })
+          })
+        )
+      )
+      await fetchEvidences()
+      setSelectedEvidences([])
+    } catch (err) {
+      console.error('Error bulk updating status:', err)
+    } finally {
+      setIsBulkLoading(false)
+    }
+  }
+
   // download recap
   const handleDownload = () => {
     if (!startDate || !endDate) {
@@ -173,16 +220,33 @@ export default function EvidenceTable() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Table Column */}
         <div className="lg:col-span-3 space-y-5">
-          {/* Search */}
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Cari evidence..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white/5 backdrop-blur-lg border border-white/10 text-sm text-white rounded-2xl py-3 pl-12 pr-4"
-            />
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={18} />
+          {/* Search and Bulk Actions */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+            <div className="relative w-full sm:flex-1">
+              <input
+                type="text"
+                placeholder="Cari evidence..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-white/5 backdrop-blur-lg border border-white/10 text-sm text-white rounded-2xl py-3 pl-12 pr-4"
+              />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40" size={18} />
+            </div>
+
+            {selectedEvidences.length > 0 && (
+              <button
+                onClick={handleBulkAccept}
+                disabled={isBulkLoading}
+                className="w-full sm:w-auto px-4 py-3 rounded-2xl bg-green-500/10 text-green-400 hover:bg-green-500/20 transition flex items-center justify-center gap-2 border border-green-500/20 disabled:opacity-50 shadow-lg shadow-green-500/10"
+              >
+                {isBulkLoading ? (
+                  <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Check size={18} />
+                )}
+                Terima {selectedEvidences.length} Terpilih
+              </button>
+            )}
           </div>
 
           {/* Table */}
@@ -199,6 +263,14 @@ export default function EvidenceTable() {
               <table className="w-full text-sm text-left text-white">
                 <thead className="text-xs uppercase text-white/60 border-b border-white/10">
                   <tr>
+                    <th className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedEvidences.length > 0 && selectedEvidences.length === Math.min(filtered.length, 10)}
+                        onChange={handleSelectAll}
+                        className="w-4 h-4 accent-blue-500 cursor-pointer rounded bg-white/10 border-white/20"
+                      />
+                    </th>
                     <th className="px-4 py-3">Bukti</th>
                     <th className="px-4 py-3">Judul</th>
                     <th className="px-4 py-3">Deskripsi</th>
@@ -212,22 +284,24 @@ export default function EvidenceTable() {
                   {filtered.map((ev) => (
                     <tr key={ev.id} className="border-b border-white/5 hover:bg-white/5 transition">
                       <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedEvidences.includes(ev.id)}
+                          onChange={() => handleToggleEvidence(ev.id)}
+                          disabled={!selectedEvidences.includes(ev.id) && selectedEvidences.length >= 10}
+                          className="w-4 h-4 accent-blue-500 cursor-pointer rounded bg-white/10 border-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
                         {ev.completion_proof ? (
                           <div
-                            className="relative w-16 h-16 rounded-lg overflow-hidden border border-white/10 cursor-pointer group"
+                            className="relative w-16 h-16 flex items-center justify-center bg-blue-500/10 text-blue-400 rounded-lg border border-white/10 cursor-pointer group hover:bg-blue-500/20 transition"
                             onClick={() => {
                               setSelectedId(ev.id)
                               setProofOpen(true)
                             }}
                           >
-                            <img
-                              src={ev.completion_proof}
-                              alt="Proof"
-                              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition">
-                              <Search className="w-5 h-5 text-white drop-shadow" />
-                            </div>
+                            <Search size={24} className="group-hover:scale-110 transition-transform" />
                           </div>
                         ) : (
                           <div className="w-16 h-16 flex items-center justify-center bg-white/5 rounded-lg border border-white/10 text-white/40">

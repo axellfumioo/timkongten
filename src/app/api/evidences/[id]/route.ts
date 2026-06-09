@@ -73,7 +73,10 @@ export async function PUT(
 
   const formData = await req.formData();
   const evidence_title = formData.get("evidence_title") as string;
-  const completion_proof = formData.get("completion_proof") as File | null;
+  const evidence_description = formData.get("evidence_description") as string;
+  const evidence_job = formData.get("evidence_job") as string;
+  const evidence_date = formData.get("evidence_date") as string;
+  const completion_proof = formData.get("completion_proof") as string | null;
 
   const oldResult = await query<{
     evidence_date: string;
@@ -88,41 +91,29 @@ export async function PUT(
 
   let fileUrl = oldData.completion_proof || null;
 
-  if (completion_proof && completion_proof.name) {
-    const fileExt = completion_proof.name.split(".").pop();
-    const filename = `${randomUUID()}.${fileExt}`;
-    fileUrl = await uploadToB2(
-      completion_proof,
-      filename,
-      process.env.R2_BUCKET!
-    );
-    if (!fileUrl)
-      return NextResponse.json(
-        { error: "Failed uploading file" },
-        { status: 500 }
-      );
+  if (completion_proof && completion_proof.trim() !== "") {
+    fileUrl = completion_proof;
   }
 
   const updateResult = await query(
-    "UPDATE evidence SET evidence_title = $1, completion_proof = $2 WHERE id = $3",
-    [evidence_title, fileUrl, id]
+    "UPDATE evidence SET evidence_title = $1, evidence_description = $2, evidence_job = $3, evidence_date = $4, completion_proof = $5 WHERE id = $6",
+    [evidence_title, evidence_description, evidence_job, evidence_date, fileUrl, id]
   );
 
   if (updateResult.rowCount === 0)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Invalidate cache
-  await cacheHelper.invalidatePattern('evidence:*');
-  await cacheHelper.invalidate('stats');
-  await cacheHelper.invalidatePattern('admin:evidences:*');
+  // Invalidate cache immediately to prevent stale GET requests
+  await cacheHelper.invalidate(`evidence:id:${id}`);
+  await cacheHelper.invalidateEvidences(user.email);
 
-  await logActivity({
+  logActivity({
     user_name: user.name,
     user_email: user.email,
     activity_type: "evidence",
     activity_name: "Evidence Updated",
     activity_message: `${user.name} updated evidence "${evidence_title}"`,
-  });
+  }).catch(err => console.error("Background task error:", err));
 
   return NextResponse.json({ message: "Evidence updated successfully" });
 }
@@ -141,27 +132,25 @@ export async function DELETE(
   if (!user?.email)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const evidenceResult = await query<{
+  const deleteResult = await query<{
     user_email: string;
     evidence_title: string;
     evidence_date: string;
   }>(
-    "SELECT user_email, evidence_title, evidence_date FROM evidence WHERE id = $1 LIMIT 1",
+    "DELETE FROM evidence WHERE id = $1 RETURNING user_email, evidence_title, evidence_date",
     [id]
   );
-
-  const evidenceData = evidenceResult.rows[0];
-  const deleteResult = await query("DELETE FROM evidence WHERE id = $1", [id]);
 
   if (deleteResult.rowCount === 0)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Invalidate cache
-  await cacheHelper.invalidatePattern('evidence:*');
-  await cacheHelper.invalidate('stats');
-  await cacheHelper.invalidatePattern('admin:evidences:*');
+  const evidenceData = deleteResult.rows[0];
 
-  await logActivity({
+  // Invalidate cache immediately to prevent stale GET requests
+  await cacheHelper.invalidate(`evidence:id:${id}`);
+  await cacheHelper.invalidateEvidences(user.email);
+
+  logActivity({
     user_name: user.name,
     user_email: user.email,
     activity_type: "evidence",
@@ -169,7 +158,7 @@ export async function DELETE(
     activity_message: `${user.name} deleted evidence "${
       evidenceData?.evidence_title || id
     }"`,
-  });
+  }).catch(err => console.error("Background task error:", err));
 
   return NextResponse.json({ message: "Evidence deleted successfully" });
 }
@@ -192,39 +181,31 @@ export async function PATCH(
   if (!["accepted", "declined"].includes(status))
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
 
-  const evidenceResult = await query<{
+  const updateResult = await query<{
     user_email: string;
     evidence_title: string;
     evidence_date: string;
   }>(
-    "SELECT user_email, evidence_title, evidence_date FROM evidence WHERE id = $1 LIMIT 1",
-    [id]
-  );
-
-  const evidenceData = evidenceResult.rows[0];
-  if (!evidenceData)
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  const updateResult = await query(
-    "UPDATE evidence SET evidence_status = $1 WHERE id = $2",
+    "UPDATE evidence SET evidence_status = $1 WHERE id = $2 RETURNING user_email, evidence_title, evidence_date",
     [status, id]
   );
 
   if (updateResult.rowCount === 0)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Invalidate cache
-  await cacheHelper.invalidatePattern('evidence:*');
-  await cacheHelper.invalidate('stats');
-  await cacheHelper.invalidatePattern('admin:evidences:*');
+  const evidenceData = updateResult.rows[0];
 
-  await logActivity({
+  // Invalidate cache immediately to prevent stale GET requests
+  await cacheHelper.invalidate(`evidence:id:${id}`);
+  await cacheHelper.invalidateEvidences(user.email);
+
+  logActivity({
     user_name: user.name,
     user_email: user.email,
     activity_type: "evidence",
     activity_name: "Evidence Status Updated",
     activity_message: `${user.name} set evidence "${evidenceData.evidence_title}" to "${status}"`,
-  });
+  }).catch(err => console.error("Background task error:", err));
 
   return NextResponse.json({ message: `Evidence status updated to ${status}` });
 }

@@ -16,13 +16,11 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
         evidence_description: '',
         evidence_job: '',
         evidence_date: '',
-        completion_proof: null as File | null,
+        completion_proof: '',
     })
     const [isEditMode, setIsEditMode] = useState(false)
     const [copied, setCopied] = useState(false)
-    const [selectedFile, setSelectedFile] = useState<File | null>(null)
     const [loading, setLoading] = useState(false)
-    const [proofUrl, setProofUrl] = useState<string | null>(null)
     const [isSubmitting, setIsSubmitting] = useState(false) // untuk submit
     const [isDeleting, setIsDeleting] = useState(false) // untuk delete
     const triggerUpdate = useGlobalStore(state => state.triggerUpdate)
@@ -45,11 +43,9 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
                     evidence_title: data.evidence_title || '',
                     evidence_description: data.evidence_description || '',
                     evidence_job: data.evidence_job || '',
-                    evidence_date: data.evidence_date || '',
-                    completion_proof: null, // File diinput manual kalau edit
+                    evidence_date: data.evidence_date ? new Date(data.evidence_date).toISOString().split('T')[0] : '',
+                    completion_proof: data.completion_proof || '',
                 })
-                setProofUrl(data.completion_proof || null)
-                setSelectedFile(null)
                 setIsEditMode(false)
             })
             .catch(err => {
@@ -60,13 +56,8 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
     }, [selectedEvidence])
 
     function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
-        const { name, value, files } = e.target as HTMLInputElement
-        if (files) {
-            setSelectedFile(files[0])
-            setFormData(prev => ({ ...prev, completion_proof: files[0] }))
-        } else {
-            setFormData(prev => ({ ...prev, [name]: value }))
-        }
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }))
     }
 
     const handleCopy = () => {
@@ -81,7 +72,7 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
 
         const form = new FormData()
         Object.entries(formData).forEach(([key, value]) => {
-            if (value) form.append(key, value as any)
+            if (value !== null && value !== undefined) form.append(key, value as any)
         })
 
         const method = selectedEvidence ? 'PUT' : 'POST'
@@ -222,58 +213,18 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
                         />
                     </div>
 
-                    {/* File */}
+                    {/* Link */}
                     <div className="md:col-span-2">
-                        <label className="block text-white font-medium mb-2">Bukti</label>
-
-                        {proofUrl && !isEditMode ? (
-                            <div
-                                className={`relative flex items-center justify-between w-full rounded-lg border px-4 py-3 cursor-pointer transition group border-white/10 bg-white/5 ${isEditMode && `opacity-70 cursor-default`}`}
-                            >
-                                <span className="truncate text-white/60 ">
-                                    Klik "Edit" untuk mengubah bukti...
-                                </span>
-                                <UploadCloud
-                                    className={`w-5 h-5 transition ${selectedFile ? 'text-white/50 group-hover:text-white' : 'text-white/60 '
-                                        }`}
-                                />
-                                <input
-                                    type="file"
-                                    name="completion_proof"
-                                    accept="image/*,.pdf"
-                                    onChange={handleChange}
-                                    disabled={!isEditMode}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                />
-                            </div>
-                        ) : (
-                            <div
-                                className={`relative flex items-center justify-between w-full rounded-lg border px-4 py-3 cursor-pointer transition group ${isEditMode
-                                    ? 'border-white/20 bg-white/10 hover:bg-white/15'
-                                    : 'border-white/10 bg-white/5'
-                                    }`}
-                            >
-                                {selectedFile ? (
-                                    <span className="truncate text-white/70">{selectedFile.name}</span>
-                                ) : (
-                                    <span className="truncate text-white/60">
-                                        Klik untuk memilih file...
-                                    </span>
-                                )}
-                                <UploadCloud
-                                    className={`w-5 h-5 transition ${selectedFile ? 'text-white/50 group-hover:text-white' : 'text-white/60 '
-                                        }`}
-                                />
-                                <input
-                                    type="file"
-                                    name="completion_proof"
-                                    accept="image/*,.pdf"
-                                    onChange={handleChange}
-                                    disabled={!isEditMode}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                />
-                            </div>
-                        )}
+                        <label className="block text-white font-medium mb-2">Link Bukti</label>
+                        <input
+                            type="url"
+                            name="completion_proof"
+                            value={formData.completion_proof}
+                            onChange={handleChange}
+                            disabled={!isEditMode}
+                            placeholder="Masukkan link bukti..."
+                            className={`w-full rounded-lg border border-white/10 bg-white/5 text-white px-4 py-3 placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 ${!isEditMode && 'opacity-70 cursor-default'}`}
+                        />
                     </div>
 
                     {/* Job */}
@@ -317,6 +268,7 @@ const ContentModalEvidence = ({ isOpen, onClose, selectedEvidence }: Props) => {
                         <input
                             name="evidence_date"
                             type="date"
+                            max={new Date().toISOString().split('T')[0]}
                             value={formData.evidence_date}
                             onChange={handleChange}
                             disabled={!isEditMode}

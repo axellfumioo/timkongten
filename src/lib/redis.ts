@@ -116,15 +116,26 @@ export const cacheHelper = {
   },
 
   /**
-   * Get cache
+   * Fast invalidation for evidences without SCAN
    */
-  async get<T>(key: string): Promise<T | null> {
+  async invalidateEvidences(user_email: string): Promise<void> {
     try {
-      const cached = await redis.get(key);
-      return cached ? JSON.parse(cached) : null;
-    } catch (error) {
-      console.error('Cache get error:', error);
-      return null;
+      const months = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+      const userKeys = months.map(m => `evidence:${user_email}:${m}`);
+      const allKeys = months.map(m => `evidence:all:${m}`);
+      
+      const keysToDelete = [
+        ...userKeys,
+        ...allKeys,
+        'stats',
+        `stats:${user_email}`,
+        'admin:evidences:pending',
+      ];
+      
+      await redis.del(...keysToDelete);
+      console.log(`Fast cache invalidated for user ${user_email} and global stats`);
+    } catch (err) {
+      console.error('Fast cache invalidation error:', err);
     }
   },
 };
