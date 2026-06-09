@@ -131,14 +131,14 @@ function App() {
                   <p className={`text-3xl font-bold ${loading ? "text-white/40 animate-pulse" : ""}`}>
                     {loading ? "—" : stats.user_evidences}
                   </p>
-                  <p className="text-sm text-gray-400">Poin Saya</p>
+                  <p className="text-sm text-gray-400">Poin Kegiatan Saya</p>
                 </div>
                 <div className="p-6 bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl transition-all">
                   <CheckCircle className="text-green-400 mb-2" />
                   <p className={`text-3xl font-bold ${loading ? "text-white/40 animate-pulse" : ""}`}>
                     {loading ? "—" : stats.evidence}
                   </p>
-                  <p className="text-sm text-gray-400">Total Poin (semua siswa)</p>
+                  <p className="text-sm text-gray-400">Total Poin Kegiatan (semua siswa)</p>
                 </div>
                 <div className="p-6 bg-gradient-to-b from-white/5 to-white/0 rounded-2xl border border-white/10 shadow-xl transition-all">
                   <BookCheck className="text-indigo-400 mb-2" />
