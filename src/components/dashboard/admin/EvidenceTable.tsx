@@ -162,15 +162,15 @@ export default function EvidenceTable() {
     if (selectedEvidences.length === 0) return
     setIsBulkLoading(true)
     try {
-      await Promise.all(
-        selectedEvidences.map((id) =>
-          fetch(`/api/evidences/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'accepted' })
-          })
-        )
-      )
+      const res = await fetch('/api/evidences/bulk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedEvidences, status: 'accepted' })
+      })
+
+      if (!res.ok) {
+        throw new Error('Gagal melakukan bulk accept')
+      }
       await fetchEvidences()
       setSelectedEvidences([])
     } catch (err) {

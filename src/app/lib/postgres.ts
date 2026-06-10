@@ -29,9 +29,7 @@ const globalForPg = globalThis as unknown as { pgPool?: Pool };
 
 export const pgPool = globalForPg.pgPool ?? new Pool(poolConfig);
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPg.pgPool = pgPool;
-}
+globalForPg.pgPool = pgPool;
 
 export async function query<T extends QueryResultRow = any>(text: string, params: any[] = []) {
   return pgPool.query<T>(text, params);
