@@ -6,8 +6,9 @@ import Sidebar from '@/components/dashboard/common/Sidebar';
 import UserManagement from '@/components/dashboard/admin/UserManagement';
 import ActivityLog from '@/components/dashboard/admin/ActivityLog';
 import EvidenceTable from '@/components/dashboard/admin/EvidenceTable';
+import Leaderboard from '@/components/dashboard/admin/Leaderboard';
 import AuthGuard from '@/components/AuthGuard';
-const settingsTabs = ['User Management', 'Point Approval', 'Activity Logs', 'Site Settings'];
+const settingsTabs = ['User Management', 'Peringkat', 'Point Approval', 'Activity Logs', 'Site Settings'];
 
 
 function App() {
@@ -51,6 +52,9 @@ function App() {
                         {/* Profile Content */}
                         {activeTab === 'User Management' && (
                             <UserManagement/>
+                        )}
+                        {activeTab === 'Peringkat' && (
+                            <Leaderboard/>
                         )}
                         {activeTab === 'Activity Logs' && (
                             <ActivityLog/>
