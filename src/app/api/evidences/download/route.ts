@@ -132,19 +132,20 @@ export async function GET(req: NextRequest) {
     });
 
     // ========================
-    // Auto-fit kolom
+    // Set static column widths (Auto-fit is too slow for large datasets)
     // ========================
-    worksheet.columns?.forEach((col) => {
-      if (!col) return;
-
-      let maxLength = 0;
-      col.eachCell?.({ includeEmpty: true }, (cell) => {
-        const cellValue = cell.value ? String(cell.value) : "";
-        maxLength = Math.max(maxLength, cellValue.length);
-      });
-
-      col.width = Math.min(maxLength + 2, 50);
-    });
+    worksheet.columns = [
+      { width: 38 }, // ID / User Name
+      { width: 25 }, // User Name / Total Evidence
+      { width: 30 }, // Content Name / Accepted Evidence
+      { width: 30 }, // Evidence Title
+      { width: 40 }, // Evidence Description
+      { width: 15 }, // Evidence Date
+      { width: 15 }, // Evidence Status
+      { width: 40 }, // Completion Proof
+      { width: 15 }, // Created At
+      { width: 20 }, // Evidence Job
+    ];
 
     const buffer = await workbook.xlsx.writeBuffer();
     return new NextResponse(buffer, {
@@ -187,14 +188,7 @@ function styleHeaderRow(row: ExcelJS.Row) {
 
 function styleDataRow(row: ExcelJS.Row) {
   row.alignment = { vertical: "top", wrapText: true };
-  row.eachCell((cell) => {
-    cell.border = {
-      top: { style: "thin" },
-      left: { style: "thin" },
-      bottom: { style: "thin" },
-      right: { style: "thin" },
-    };
-  });
+  // Border each cell is removed for massive performance gains
 }
 
 function formatDate(dateStr?: string | null) {

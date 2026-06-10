@@ -21,8 +21,9 @@ const connectionString = rawConnectionString
 const poolConfig: PoolConfig = {
   connectionString,
   ssl: shouldUseSsl ? { rejectUnauthorized: false } : false,
-  max: parseInt(process.env.DATABASE_POOL_MAX || "10", 10),
+  max: parseInt(process.env.DATABASE_POOL_MAX || (process.env.NODE_ENV === "production" ? "10" : "2"), 10),
   idleTimeoutMillis: parseInt(process.env.DATABASE_IDLE_TIMEOUT_MS || "30000", 10),
+  allowExitOnIdle: process.env.NODE_ENV !== "production",
 };
 
 const globalForPg = globalThis as unknown as { pgPool?: Pool };
