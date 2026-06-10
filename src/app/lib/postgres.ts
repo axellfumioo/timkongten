@@ -5,6 +5,7 @@ type PoolConfig = {
   ssl?: { rejectUnauthorized: boolean } | boolean;
   max?: number;
   idleTimeoutMillis?: number;
+  allowExitOnIdle?: boolean;
 };
 
 const rawConnectionString = process.env.DATABASE_URL;
