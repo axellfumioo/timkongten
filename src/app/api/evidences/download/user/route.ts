@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
       "Evidence Status",
       "Completion Proof",
       "Created At",
-      "Evidence Job",
+      "Kategori",
     ];
     const headerRow = worksheet.addRow(headers);
     headerRow.font = { bold: true, size: 11 };

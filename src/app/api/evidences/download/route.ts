@@ -110,7 +110,7 @@ export async function GET(req: NextRequest) {
       "Evidence Status",
       "Completion Proof",
       "Created At",
-      "Evidence Job",
+      "Kategori",
     ];
     const historyHeaderRow = worksheet.addRow(historyHeader);
     styleHeaderRow(historyHeaderRow);
